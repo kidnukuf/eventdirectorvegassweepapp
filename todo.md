@@ -38,15 +38,15 @@
 - [x] SSE endpoint: real-time broadcast to all doorman tablets on token invalidation
 
 ## Phase 4 — Event Director Dashboard
-- [ ] Hierarchical layout: Event → Center → Team → Bowler (collapsible)
-- [ ] Search bar: name, 10-digit ID, center, team, phone
+- [x] Hierarchical layout: Event → Center → Team → Bowler (collapsible)
+- [x] Search bar: name, 10-digit ID, center, team, phone
 - [x] Stats bar: Total / Pre-Registered / Signed Up / Verified / Checked In / Unmatched
 - [ ] Team color-coding: gray (incomplete) → yellow (all registered) → green (captain verified)
 - [ ] Full bowler record editor (all fields, no restrictions, all edits logged)
 - [x] Doorman account management panel (create DM1–DM99, set password, view active)
 - [x] QR Test System: generate test QR (0000000000), 3-mode test, pass/fail report
 - [x] Import Data panel (CSV / Sheets / Paste) with progress indicator
-- [ ] Unmatched sign-ups queue with manual link tool
+- [x] Unmatched sign-ups queue with manual link tool
 
 ## Phase 5 — QR Code System + Doorman Check-In Screen
 - [x] Server-side cryptographic QR token generation (single-use, event-scoped)

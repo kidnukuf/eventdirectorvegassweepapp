@@ -65,19 +65,60 @@ export default function AdminDashboard() {
     onError: (e) => toast.error(e.message),
   });
 
-  const exportCSV = () => {
-    const rows = (bowlers as Bowler[]);
-    if (!rows.length) { toast.error("No data to export"); return; }
-    const headers = ["ScantronID","FirstName","LastName","Phone","Email","Center","Team","Status","CheckIn","Room","Banquet"];
-    const csv = [headers.join(","), ...rows.map((b) => [
-      b.scantronId, b.legalFirstName, b.legalLastName, b.phone, b.email,
-      b.centerName, b.teamName, b.registrationStatus, b.checkinDate, b.roomType, b.banquetAmount
-    ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const downloadCSV = (filename: string, headers: string[], rows: string[][]) => {
+    const csv = [headers.join(","), ...rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "vegas-sweeps-roster.csv"; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success("Roster exported to CSV");
+  };
+
+  const exportFullRoster = () => {
+    const rows = (bowlers as Bowler[]);
+    if (!rows.length) { toast.error("No data to export"); return; }
+    downloadCSV("vegas-sweeps-full-roster.csv",
+      ["ScantronID","FirstName","LastName","Phone","Email","Center","Team","Status","CheckIn","Room","Banquet","LaneAssignment","SquadTime"],
+      rows.map((b) => [b.scantronId,b.legalFirstName,b.legalLastName,b.phone,b.email,b.centerName,b.teamName,b.registrationStatus,b.checkinDate,b.roomType,b.banquetAmount,b.laneAssignment,b.squadTime] as string[])
+    );
+    toast.success("Full roster exported"); setShowExportMenu(false);
+  };
+
+  const exportByCenter = () => {
+    const rows = (bowlers as Bowler[]);
+    if (!rows.length) { toast.error("No data to export"); return; }
+    // Group by center and create separate CSV sections
+    const grouped: Record<string, Bowler[]> = {};
+    rows.forEach((b) => { const c = String(b.centerName ?? "Unknown"); if (!grouped[c]) grouped[c] = []; grouped[c].push(b); });
+    const headers = ["Center","ScantronID","FirstName","LastName","Team","Status","Phone"];
+    const allRows: string[][] = [];
+    Object.entries(grouped).forEach(([center, members]) => {
+      allRows.push([`=== ${center} (${members.length} bowlers) ===`, "", "", "", "", "", ""]);
+      members.forEach((b) => allRows.push([center,b.scantronId,b.legalFirstName,b.legalLastName,b.teamName,b.registrationStatus,b.phone] as string[]));
+    });
+    downloadCSV("vegas-sweeps-by-center.csv", headers, allRows);
+    toast.success("Per-center export done"); setShowExportMenu(false);
+  };
+
+  const exportCheckedIn = () => {
+    const rows = (bowlers as Bowler[]).filter((b) => b.registrationStatus === "checked_in");
+    if (!rows.length) { toast.error("No checked-in bowlers yet"); return; }
+    downloadCSV("vegas-sweeps-checkedin.csv",
+      ["ScantronID","FirstName","LastName","Center","Team","Phone","LaneAssignment","SquadTime"],
+      rows.map((b) => [b.scantronId,b.legalFirstName,b.legalLastName,b.centerName,b.teamName,b.phone,b.laneAssignment,b.squadTime] as string[])
+    );
+    toast.success("Check-in status exported"); setShowExportMenu(false);
+  };
+
+  const exportAuditLog = () => {
+    const logs = (auditLog as Record<string, unknown>[]);
+    if (!logs.length) { toast.error("No audit log entries yet"); return; }
+    downloadCSV("vegas-sweeps-audit-log.csv",
+      ["Timestamp","Action","ActorRole","ActorId","TargetType","TargetId","Details"],
+      logs.map((l) => [l.createdAt,l.action,l.actorRole,l.actorId,l.targetType,l.targetId,l.details] as string[])
+    );
+    toast.success("Audit log exported"); setShowExportMenu(false);
   };
 
   const generateTestQr = trpc.tokens.generateTest.useMutation({
@@ -140,7 +181,17 @@ export default function AdminDashboard() {
             </h1>
           </div>
           <div className="flex gap-2">
-            <button onClick={exportCSV} className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors">📤 Export CSV</button>
+            <div className="relative">
+              <button onClick={() => setShowExportMenu(!showExportMenu)} className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors">📤 Export ▾</button>
+              {showExportMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-yellow-500/30 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden">
+                  <button onClick={exportFullRoster} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-yellow-300 transition-colors">📋 Full Roster</button>
+                  <button onClick={exportByCenter} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-yellow-300 transition-colors">🏠 Per-Center Roster</button>
+                  <button onClick={exportCheckedIn} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-cyan-300 transition-colors">✅ Check-In Status</button>
+                  <button onClick={exportAuditLog} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-gray-300 transition-colors">📜 Audit Log</button>
+                </div>
+              )}
+            </div>
             <button onClick={() => setLocation("/import")} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold transition-colors">📥 Import Data</button>
           </div>
         </div>
