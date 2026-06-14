@@ -22,7 +22,26 @@ export default function DoormanCheckIn() {
   const [selectedBowler, setSelectedBowler] = useState<BowlerResult | null>(null);
   const [reentryBowler, setReentryBowler] = useState<BowlerResult | null>(null);
   const [reminderDismissed, setReminderDismissed] = useState(false);
+  const [lastCheckedIn, setLastCheckedIn] = useState<{ name: string; scantronId: string; center: string } | null>(null);
+  const [sseConnected, setSseConnected] = useState(false);
   const tokenInputRef = useRef<HTMLInputElement>(null);
+
+  // SSE subscription — real-time token invalidation from other doorman tablets
+  useEffect(() => {
+    if (!loggedIn) return;
+    const es = new EventSource("/api/events/stream");
+    es.onopen = () => setSseConnected(true);
+    es.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data) as Record<string, unknown>;
+        if (msg.type === "TOKEN_INVALIDATED") {
+          toast.info(`Token used at ${String(msg.designation ?? "another station")} — ${String(msg.bowlerName ?? "")}`);
+        }
+      } catch { /* ignore */ }
+    };
+    es.onerror = () => setSseConnected(false);
+    return () => es.close();
+  }, [loggedIn]);
 
   const loginMutation = trpc.appAuth.doormanLogin.useMutation({
     onSuccess: (data) => {
@@ -50,7 +69,11 @@ export default function DoormanCheckIn() {
   const validateToken = trpc.tokens.validate.useMutation({
     onSuccess: (data: Record<string, unknown>) => {
       if (data.success) {
-        setCheckInResult({ success: true, message: `ENTRY GRANTED`, bowlerName: String(data.bowlerName ?? "") });
+        const name = String(data.bowlerName ?? "");
+        const sid = String(data.scantronId ?? "");
+        const center = String(data.centerName ?? "");
+        setCheckInResult({ success: true, message: `ENTRY GRANTED`, bowlerName: name });
+        setLastCheckedIn({ name, scantronId: sid, center });
         setShowDenied(false);
         toast.success("Check-in successful!");
         setTimeout(() => setCheckInResult(null), 5000);
@@ -169,6 +192,8 @@ export default function DoormanCheckIn() {
             <h1 className="text-xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 15px rgba(255,215,0,0.5)" }}>
               🚪 DOORMAN CHECK-IN
             </h1>
+            <span title={sseConnected ? "Live sync active" : "Connecting..."}
+              className={`w-2 h-2 rounded-full ${sseConnected ? "bg-green-400" : "bg-gray-600"}`} />
           </div>
           <button onClick={() => setWristbandMode(!wristbandMode)}
             className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${wristbandMode ? "bg-green-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}>
@@ -190,6 +215,21 @@ export default function DoormanCheckIn() {
       )}
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        {/* Last Checked-In Bowler Card */}
+        {lastCheckedIn && (
+          <div className="bg-[#0a1a0a] rounded-2xl border-2 border-green-500/60 p-4 shadow-[0_0_30px_rgba(0,255,0,0.15)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-green-400 font-semibold mb-1">LAST CHECK-IN — GRANTED</div>
+                <div className="text-xl font-black text-white">{lastCheckedIn.name}</div>
+                <div className="text-sm text-gray-400">{lastCheckedIn.center}</div>
+                <div className="text-xs font-mono mt-1" style={{ color: "#ffd700" }}>{lastCheckedIn.scantronId}</div>
+              </div>
+              <div className="text-5xl">✅</div>
+            </div>
+          </div>
+        )}
+
         {/* QR Scan / Token Entry */}
         <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5">
           <h2 className="text-sm font-semibold text-gray-400 mb-3">QR Code / Bluetooth Scanner / Manual Token</h2>

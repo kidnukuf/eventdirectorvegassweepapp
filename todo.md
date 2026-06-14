@@ -35,7 +35,7 @@
 - [x] wristbands router: issue (one-time), reentry scan, deny/flag
 - [x] doorman router: create DM account, list, reset password
 - [x] import router: parse CSV/paste, fetch Google Sheets, validate, write, export
-- [ ] SSE endpoint: real-time broadcast to all doorman tablets on token invalidation
+- [x] SSE endpoint: real-time broadcast to all doorman tablets on token invalidation
 
 ## Phase 4 — Event Director Dashboard
 - [ ] Hierarchical layout: Event → Center → Team → Bowler (collapsible)
@@ -53,13 +53,13 @@
 - [x] QR code display on bowler profile page (self-display)
 - [x] Doorman check-in screen: camera scan (html5-qrcode) + Bluetooth HID input
 - [x] Atomic token invalidation: DB transaction → mark used → write check_in → write audit_log
-- [ ] SSE broadcast to all connected doorman tablets on every invalidation
+- [x] SSE broadcast to all connected doorman tablets on every invalidation
 - [ ] Bowler card display after successful scan (name, photo, seat/table)
-- [ ] DENIED screen (red flash) for invalid/used tokens
+- [x] DENIED screen (red flash) for invalid/used tokens
 - [x] Wristband issuance flow: one-time only, mandatory doorman prompt
 - [x] Reentry scan flow: validate wristband QR, check condition
-- [ ] Denial flow: "Wristband Compromised" button → audit log
-- [ ] Persistent doorman reminder panel (verify ID, check wristband, explain policy)
+- [x] Denial flow: "Wristband Compromised" button → audit log
+- [x] Persistent doorman reminder panel (verify ID, check wristband, explain policy)
 
 ## Phase 6 — Team Captain + Bowler + Program Director Pages
 - [x] Team Captain page: ⭐ header, roster table, completion ring, responsibility cards

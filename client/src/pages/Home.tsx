@@ -18,7 +18,7 @@ export default function Home() {
       icon: "📋",
       title: "Program Director",
       desc: "League-scoped oversight and reporting",
-      path: "/admin?role=program",
+      path: "/program-director",
       color: "from-cyan-500 to-blue-500",
       glow: "shadow-cyan-500/40",
     },

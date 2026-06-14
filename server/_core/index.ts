@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { registerSseClient, unregisterSseClient } from "./sse";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,7 +39,6 @@ async function startServer() {
   registerOAuthRoutes(app);
 
   // SSE endpoint — doorman tablets subscribe here for real-time token invalidation events
-  const { registerSseClient, unregisterSseClient } = await import("./sse");
   app.get("/api/events/stream", (req, res) => {
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     res.setHeader("Content-Type", "text/event-stream");
