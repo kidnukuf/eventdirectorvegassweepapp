@@ -1,414 +1,378 @@
 import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
+import { toast } from "sonner";
 
-type AdminRole = "EventDirector" | "ProgramDirector";
+type Bowler = Record<string, unknown>;
 
-function NeonHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <header
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        borderBottom: "1px solid #ffd70033",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{ color: "#888", background: "none", border: "none", cursor: "pointer", fontSize: 20, lineHeight: 1 }}
-        title="Back to Home"
-      >
-        ←
-      </button>
-      <span style={{ fontSize: 22 }}>🎳</span>
-      <span
-        style={{
-          fontFamily: "'Orbitron', sans-serif",
-          color: "#ffd700",
-          textShadow: "0 0 10px #ffd70088",
-          fontWeight: 700,
-          fontSize: "clamp(0.9rem, 2.5vw, 1.1rem)",
-          letterSpacing: "0.05em",
-        }}
-      >
-        VEGAS SWEEPS — ADMIN DASHBOARD
-      </span>
-    </header>
-  );
-}
+const STATUS_COLORS: Record<string, string> = {
+  pre_registered: "bg-gray-700 text-gray-300",
+  signed_up: "bg-blue-900 text-blue-300",
+  verified: "bg-green-900 text-green-300",
+  checked_in: "bg-yellow-900 text-yellow-300",
+  unmatched: "bg-red-900 text-red-300",
+};
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div
-      style={{
-        background: "rgba(0,0,0,0.7)",
-        border: `1px solid ${color}44`,
-        borderRadius: 12,
-        padding: "20px 24px",
-        textAlign: "center",
-        boxShadow: `0 0 12px ${color}22`,
-        flex: 1,
-        minWidth: 120,
-      }}
-    >
-      <div
-        style={{
-          fontSize: "2.2rem",
-          fontWeight: 700,
-          color,
-          textShadow: `0 0 10px ${color}88`,
-          fontFamily: "'Orbitron', sans-serif",
-        }}
-      >
-        {value}
-      </div>
-      <div style={{ color: "#aaa", fontSize: "0.8rem", marginTop: 4, letterSpacing: "0.08em" }}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (status === "checked_in") return <span className="badge-checked-in">CHECKED IN</span>;
-  if (status === "registered") return <span className="badge-registered">REGISTERED</span>;
-  return <span className="badge-pending">PENDING</span>;
-}
+const STATUS_LABELS: Record<string, string> = {
+  pre_registered: "Pre-Reg",
+  signed_up: "Signed Up",
+  verified: "Verified",
+  checked_in: "Checked In",
+  unmatched: "Unmatched",
+};
 
 export default function AdminDashboard() {
-  const [, navigate] = useLocation();
-  const [role, setRole] = useState<AdminRole>("EventDirector");
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"roster" | "audit">("roster");
+  const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest">("roster");
+  const [editingBowler, setEditingBowler] = useState<Bowler | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [showAllFields, setShowAllFields] = useState(false);
+  const [newDoorman, setNewDoorman] = useState({ designation: "", password: "" });
+  const [testQr, setTestQr] = useState<{ qrDataUrl: string; tokenValue: string } | null>(null);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
-  // Debounce search
-  const handleSearch = (val: string) => {
-    setSearch(val);
-    clearTimeout((window as any)._searchTimer);
-    (window as any)._searchTimer = setTimeout(() => setDebouncedSearch(val), 300);
+  const EVENT_ID = 1;
+
+  const { data: bowlers = [], isLoading, refetch } = trpc.bowlers.adminList.useQuery({ eventId: EVENT_ID });
+  const { data: stats } = trpc.bowlers.stats.useQuery({ eventId: EVENT_ID });
+  const { data: auditLog = [] } = trpc.audit.list.useQuery({ eventId: EVENT_ID, limit: 200 });
+  const { data: doormen = [], refetch: refetchDoormen } = trpc.appAuth.listDoormen.useQuery({ eventId: EVENT_ID });
+
+  const updateBowler = trpc.bowlers.update.useMutation({
+    onSuccess: () => { toast.success("Bowler updated"); refetch(); setEditingBowler(null); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const createDoorman = trpc.appAuth.createDoorman.useMutation({
+    onSuccess: () => { toast.success("Doorman created"); refetchDoormen(); setNewDoorman({ designation: "", password: "" }); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const exportCSV = () => {
+    const rows = (bowlers as Bowler[]);
+    if (!rows.length) { toast.error("No data to export"); return; }
+    const headers = ["ScantronID","FirstName","LastName","Phone","Email","Center","Team","Status","CheckIn","Room","Banquet"];
+    const csv = [headers.join(","), ...rows.map((b) => [
+      b.scantronId, b.legalFirstName, b.legalLastName, b.phone, b.email,
+      b.centerName, b.teamName, b.registrationStatus, b.checkinDate, b.roomType, b.banquetAmount
+    ].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "vegas-sweeps-roster.csv"; a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Roster exported to CSV");
   };
 
-  const statsQuery = trpc.admin.getStats.useQuery({ eventId: 1 });
-  const bowlersQuery = trpc.admin.getBowlers.useQuery({ eventId: 1, search: debouncedSearch || undefined });
-  const auditQuery = trpc.admin.getAuditLog.useQuery({ eventId: 1, limit: 50 }, { enabled: activeTab === "audit" });
-  const updateStatus = trpc.admin.updateBowlerStatus.useMutation({
-    onSuccess: () => {
-      bowlersQuery.refetch();
-      statsQuery.refetch();
+  const generateTestQr = trpc.tokens.generateTest.useMutation({
+    onSuccess: (data) => setTestQr(data),
+  });
+
+  const validateToken = trpc.tokens.validate.useMutation({
+    onSuccess: (data) => {
+      if ((data as Record<string, unknown>).isTest) setTestResult("✅ TEST QR SYSTEM WORKING — Token scanned and invalidated successfully");
+      else if (data.success) setTestResult("✅ VALID — Bowler checked in");
+      else setTestResult(`❌ ${(data as Record<string, unknown>).error}`);
     },
   });
 
-  const stats = statsQuery.data;
-  const bowlers = bowlersQuery.data ?? [];
+  const grouped = useMemo(() => {
+    const filtered = (bowlers as Bowler[]).filter((b) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        String(b.legalFirstName ?? "").toLowerCase().includes(q) ||
+        String(b.legalLastName ?? "").toLowerCase().includes(q) ||
+        String(b.scantronId ?? "").includes(q) ||
+        String(b.phone ?? "").includes(q) ||
+        String(b.centerName ?? "").toLowerCase().includes(q) ||
+        String(b.teamName ?? "").toLowerCase().includes(q) ||
+        String(b.teamCode ?? "").includes(q)
+      );
+    });
+
+    const centerMap = new Map<string, Map<string, Bowler[]>>();
+    for (const b of filtered) {
+      const center = String(b.centerName ?? "Unknown Center");
+      const team = `Team ${b.teamCode ?? "??"} — ${b.teamName ?? ""}`;
+      if (!centerMap.has(center)) centerMap.set(center, new Map());
+      const teamMap = centerMap.get(center)!;
+      if (!teamMap.has(team)) teamMap.set(team, []);
+      teamMap.get(team)!.push(b);
+    }
+    return centerMap;
+  }, [bowlers, search]);
+
+  const statCards = [
+    { label: "Total", value: (stats as Record<string, unknown>)?.total ?? 0, color: "text-white" },
+    { label: "Pre-Reg", value: (stats as Record<string, unknown>)?.preRegistered ?? 0, color: "text-gray-400" },
+    { label: "Signed Up", value: (stats as Record<string, unknown>)?.signedUp ?? 0, color: "text-blue-400" },
+    { label: "Verified", value: (stats as Record<string, unknown>)?.verified ?? 0, color: "text-green-400" },
+    { label: "Checked In", value: (stats as Record<string, unknown>)?.checkedIn ?? 0, color: "text-yellow-400" },
+    { label: "Unmatched", value: (stats as Record<string, unknown>)?.unmatched ?? 0, color: "text-red-400" },
+  ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-      <NeonHeader onBack={() => navigate("/")} />
-
-      <div className="container" style={{ paddingTop: 24, paddingBottom: 40 }}>
-        {/* Role Switcher */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ color: "#666", fontSize: "0.85rem", marginRight: 4 }}>View as:</span>
-          {(["EventDirector", "ProgramDirector"] as AdminRole[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              style={{
-                padding: "6px 18px",
-                borderRadius: 20,
-                border: `1px solid ${role === r ? "#ffd700" : "#333"}`,
-                background: role === r ? "#ffd70022" : "transparent",
-                color: role === r ? "#ffd700" : "#666",
-                cursor: "pointer",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                transition: "all 0.15s",
-              }}
-            >
-              {r === "EventDirector" ? "⚡ Event Director" : "📋 Program Director"}
-            </button>
-          ))}
-          <div style={{ marginLeft: "auto", color: "#444", fontSize: "0.8rem" }}>
-            {role === "ProgramDirector" && "Showing league-scoped view"}
+    <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/30 px-4 py-4 sticky top-0 z-40 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
+            <span className="text-gray-600">|</span>
+            <h1 className="text-2xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
+              🎯 EVENT DIRECTOR
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={exportCSV} className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors">📤 Export CSV</button>
+            <button onClick={() => setLocation("/import")} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold transition-colors">📥 Import Data</button>
           </div>
         </div>
+      </div>
 
-        {/* Stats Row */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-          <StatCard label="TOTAL BOWLERS" value={stats?.total ?? 0} color="#ffd700" />
-          <StatCard label="REGISTERED" value={stats?.registered ?? 0} color="#00ff88" />
-          <StatCard label="CHECKED IN" value={stats?.checkedIn ?? 0} color="#00ffff" />
-          <StatCard label="PENDING" value={stats?.pending ?? 0} color="#ffaa00" />
+      <div className="bg-[#111] border-b border-white/10 px-4 py-3">
+        <div className="max-w-7xl mx-auto grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {statCards.map((s) => (
+            <div key={s.label} className="text-center">
+              <div className={`text-2xl font-black ${s.color}`}>{String(s.value)}</div>
+              <div className="text-xs text-gray-500">{s.label}</div>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: "1px solid #333" }}>
-          {(["roster", "audit"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "10px 24px",
-                background: "none",
-                border: "none",
-                borderBottom: activeTab === tab ? "2px solid #ffd700" : "2px solid transparent",
-                color: activeTab === tab ? "#ffd700" : "#666",
-                cursor: "pointer",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                letterSpacing: "0.05em",
-                transition: "color 0.15s",
-                textTransform: "uppercase",
-              }}
-            >
-              {tab === "roster" ? "🎳 Bowler Roster" : "📋 Audit Log"}
+      <div className="bg-[#111] border-b border-white/10 px-4">
+        <div className="max-w-7xl mx-auto flex gap-1">
+          {(["roster", "doormen", "qrtest", "audit"] as const).map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-4 py-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
+              {tab === "qrtest" ? "QR Test" : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "roster" && (
-          <>
-            {/* Search */}
-            <div style={{ marginBottom: 16 }}>
-              <input
-                className="neon-input"
-                placeholder="🔍  Search by name, ID, team, or phone..."
-                value={search}
-                onChange={(e) => handleSearch(e.target.value)}
-                style={{ maxWidth: 480 }}
-              />
+          <div>
+            <div className="mb-4">
+              <input type="text" placeholder="🔍 Search by name, ID, phone, center, team..." value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full px-4 py-3 bg-[#1a1a1a] border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500" />
             </div>
-
-            {/* Table */}
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  background: "rgba(0,0,0,0.5)",
-                  borderRadius: 10,
-                  overflow: "hidden",
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "rgba(0,0,0,0.8)", borderBottom: "1px solid #ffd70033" }}>
-                    {["10-Digit ID", "Name", "Team", "Center", "Phone", "Status", "Actions"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "12px 14px",
-                          textAlign: "left",
-                          color: "#00ffff",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h}
-                      </th>
+            {isLoading ? (
+              <div className="text-center py-12 text-gray-500">Loading roster...</div>
+            ) : (
+              <div className="space-y-6">
+                {Array.from(grouped.entries()).map(([centerName, teamMap]) => (
+                  <div key={centerName} className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
+                    <div className="px-5 py-3 bg-gradient-to-r from-yellow-500/20 to-transparent border-b border-yellow-500/30">
+                      <h2 className="text-lg font-bold text-yellow-400">🏠 {centerName}</h2>
+                    </div>
+                    {Array.from(teamMap.entries()).map(([teamLabel, members]) => (
+                      <div key={teamLabel} className="border-b border-white/5 last:border-0">
+                        <div className="px-5 py-2 bg-cyan-500/10 border-b border-cyan-500/20">
+                          <h3 className="text-sm font-semibold text-cyan-400">{teamLabel}</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-gray-500 text-xs border-b border-white/5">
+                                <th className="px-4 py-2 text-left">ID</th>
+                                <th className="px-4 py-2 text-left">Name</th>
+                                <th className="px-4 py-2 text-left">Phone</th>
+                                <th className="px-4 py-2 text-left">Check-In</th>
+                                <th className="px-4 py-2 text-left">Room</th>
+                                <th className="px-4 py-2 text-left">Banquet</th>
+                                <th className="px-4 py-2 text-left">Status</th>
+                                <th className="px-4 py-2 text-left">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {members.map((b) => (
+                                <tr key={String(b.id)} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                  <td className="px-4 py-2 font-mono text-yellow-400 text-xs">{String(b.scantronId ?? "—")}</td>
+                                  <td className="px-4 py-2 font-semibold">{b.isCapitain ? "⭐ " : ""}{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</td>
+                                  <td className="px-4 py-2 text-gray-400">{String(b.phone ?? "—")}</td>
+                                  <td className="px-4 py-2 text-gray-400 text-xs">{String(b.checkinDate ?? "—")}</td>
+                                  <td className="px-4 py-2 text-gray-400 text-xs">{String(b.roomType ?? "—")}</td>
+                                  <td className="px-4 py-2 text-gray-400 text-xs">{b.banquetAmount ? `$${b.banquetAmount}` : "—"}</td>
+                                  <td className="px-4 py-2">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[String(b.registrationStatus ?? "pre_registered")]}`}>
+                                      {STATUS_LABELS[String(b.registrationStatus ?? "pre_registered")] ?? String(b.registrationStatus)}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? "") }); }}
+                                      className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {bowlersQuery.isLoading ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        Loading roster...
-                      </td>
-                    </tr>
-                  ) : bowlers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        No bowlers found
-                      </td>
-                    </tr>
-                  ) : (
-                    bowlers.map((b, i) => (
-                      <tr
-                        key={b.id}
-                        style={{
-                          borderBottom: "1px solid #ffffff08",
-                          background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
-                          transition: "background 0.1s",
-                        }}
-                        onMouseEnter={(e) =>
-                          ((e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,215,0,0.04)")
-                        }
-                        onMouseLeave={(e) =>
-                          ((e.currentTarget as HTMLTableRowElement).style.background =
-                            i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)")
-                        }
-                      >
-                        <td
-                          style={{
-                            padding: "11px 14px",
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: "0.78rem",
-                            color: "#ffd700",
-                            letterSpacing: "0.05em",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {b.scantronId ?? "—"}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#eee", fontSize: "0.9rem" }}>
-                          <div style={{ fontWeight: 600 }}>{b.legalName}</div>
-                          {b.preferredName && b.preferredName !== b.legalName && (
-                            <div style={{ color: "#888", fontSize: "0.78rem" }}>"{b.preferredName}"</div>
-                          )}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#ccc", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                          {b.teamName ?? "—"}
-                          {b.teamCode && (
-                            <span style={{ color: "#555", marginLeft: 6, fontSize: "0.75rem" }}>
-                              #{b.teamCode}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#888", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
-                          {b.centerName ?? "—"}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#aaa", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                          {b.phone}
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          <StatusBadge status={b.status} />
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          {b.status !== "checked_in" && (
-                            <button
-                              onClick={() =>
-                                updateStatus.mutate({ bowlerId: b.id, status: "checked_in" })
-                              }
-                              style={{
-                                padding: "4px 12px",
-                                background: "#00ffff22",
-                                color: "#00ffff",
-                                border: "1px solid #00ffff44",
-                                borderRadius: 6,
-                                cursor: "pointer",
-                                fontSize: "0.78rem",
-                                fontWeight: 600,
-                                transition: "all 0.15s",
-                              }}
-                            >
-                              Check In
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                  </div>
+                ))}
+                {grouped.size === 0 && (
+                  <div className="text-center py-12 text-gray-500">{search ? "No bowlers match your search." : "No bowlers found. Import data to get started."}</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "doormen" && (
+          <div className="max-w-2xl">
+            <h2 className="text-xl font-bold text-yellow-400 mb-4">Doorman Accounts</h2>
+            <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5 mb-5">
+              <h3 className="text-sm font-semibold text-gray-400 mb-3">Create New Doorman</h3>
+              <div className="flex gap-3 flex-wrap">
+                <input placeholder="Designation (e.g. DM1)" value={newDoorman.designation}
+                  onChange={(e) => setNewDoorman({ ...newDoorman, designation: e.target.value })}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                <input type="password" placeholder="Password" value={newDoorman.password}
+                  onChange={(e) => setNewDoorman({ ...newDoorman, password: e.target.value })}
+                  className="flex-1 min-w-[120px] px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                <button onClick={() => createDoorman.mutate({ designation: newDoorman.designation, password: newDoorman.password, eventId: EVENT_ID })}
+                  disabled={!newDoorman.designation || !newDoorman.password || createDoorman.isPending}
+                  className="px-4 py-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-bold rounded-lg text-sm transition-colors">
+                  {createDoorman.isPending ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {(doormen as Record<string, unknown>[]).map((d) => (
+                <div key={String(d.id)} className="flex items-center justify-between bg-[#1a1a1a] rounded-xl border border-white/10 px-4 py-3">
+                  <div><span className="font-bold text-cyan-400">{String(d.designation)}</span><span className="text-gray-500 text-sm ml-3">{String(d.username)}</span></div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${d.active ? "bg-green-900 text-green-300" : "bg-gray-700 text-gray-400"}`}>{d.active ? "Active" : "Inactive"}</span>
+                </div>
+              ))}
+              {(doormen as unknown[]).length === 0 && <p className="text-gray-500 text-sm">No doorman accounts created yet.</p>}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "qrtest" && (
+          <div className="max-w-lg">
+            <h2 className="text-xl font-bold text-yellow-400 mb-2">QR Code System Test</h2>
+            <p className="text-gray-400 text-sm mb-5">Generates a test QR using reserved ID <span className="font-mono text-yellow-400">0000000000</span> — never assigned to a real bowler. Tests scanner, network, and token invalidation.</p>
+            <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6 text-center">
+              {!testQr ? (
+                <button onClick={() => { generateTestQr.mutate({ eventId: EVENT_ID }); setTestResult(null); }}
+                  disabled={generateTestQr.isPending}
+                  className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl text-lg transition-all active:scale-95">
+                  {generateTestQr.isPending ? "Generating..." : "🔲 Generate Test QR"}
+                </button>
+              ) : (
+                <div>
+                  <p className="text-xs text-gray-500 mb-3 font-mono break-all">{testQr.tokenValue}</p>
+                  <img src={testQr.qrDataUrl} alt="Test QR" className="mx-auto rounded-xl border-2 border-yellow-500/50 mb-4" style={{ width: 220 }} />
+                  <div className="flex gap-3 justify-center flex-wrap">
+                    <button onClick={() => validateToken.mutate({ tokenValue: testQr.tokenValue, doormanId: 0, method: "QR" })}
+                      disabled={validateToken.isPending}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-sm transition-colors">
+                      {validateToken.isPending ? "Scanning..." : "✅ Simulate Scan"}
+                    </button>
+                    <button onClick={() => { setTestQr(null); setTestResult(null); }}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">Reset</button>
+                  </div>
+                  {testResult && (
+                    <div className={`mt-4 p-3 rounded-xl text-sm font-semibold ${testResult.startsWith("✅") ? "bg-green-900/50 text-green-300 border border-green-500/30" : "bg-red-900/50 text-red-300 border border-red-500/30"}`}>
+                      {testResult}
+                    </div>
                   )}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
-            <div style={{ color: "#444", fontSize: "0.8rem", marginTop: 10 }}>
-              Showing {bowlers.length} bowler{bowlers.length !== 1 ? "s" : ""}
-            </div>
-          </>
+          </div>
         )}
 
         {activeTab === "audit" && (
           <div>
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  background: "rgba(0,0,0,0.5)",
-                  borderRadius: 10,
-                  overflow: "hidden",
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "rgba(0,0,0,0.8)", borderBottom: "1px solid #ffd70033" }}>
-                    {["Time", "Actor", "Role", "Action", "Details"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "12px 14px",
-                          textAlign: "left",
-                          color: "#00ffff",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditQuery.isLoading ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        Loading audit log...
-                      </td>
+            <h2 className="text-xl font-bold text-yellow-400 mb-4">Audit Log</h2>
+            <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 text-xs border-b border-white/10">
+                      <th className="px-4 py-2 text-left">Time</th>
+                      <th className="px-4 py-2 text-left">Role</th>
+                      <th className="px-4 py-2 text-left">Action</th>
+                      <th className="px-4 py-2 text-left">Target</th>
+                      <th className="px-4 py-2 text-left">Details</th>
                     </tr>
-                  ) : (auditQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        No audit entries yet
-                      </td>
-                    </tr>
-                  ) : (
-                    (auditQuery.data ?? []).map((entry, i) => (
-                      <tr
-                        key={entry.id}
-                        style={{
-                          borderBottom: "1px solid #ffffff08",
-                          background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
-                        }}
-                      >
-                        <td style={{ padding: "10px 14px", color: "#888", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#ccc", fontSize: "0.85rem" }}>
-                          {entry.actorId ?? "—"}
-                        </td>
-                        <td style={{ padding: "10px 14px" }}>
-                          <span
-                            style={{
-                              background: "#ffd70022",
-                              color: "#ffd700",
-                              border: "1px solid #ffd70033",
-                              borderRadius: 12,
-                              padding: "2px 10px",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {entry.actorRole}
-                          </span>
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#00ffff", fontSize: "0.85rem", fontWeight: 600 }}>
-                          {entry.action}
-                        </td>
-                        <td style={{ padding: "10px 14px", color: "#aaa", fontSize: "0.85rem" }}>
-                          {entry.details ?? "—"}
-                        </td>
+                  </thead>
+                  <tbody>
+                    {(auditLog as Record<string, unknown>[]).map((log) => (
+                      <tr key={String(log.id)} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{new Date(log.timestamp as string).toLocaleString()}</td>
+                        <td className="px-4 py-2 text-cyan-400 text-xs">{String(log.actorRole ?? "")}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-yellow-400">{String(log.action ?? "")}</td>
+                        <td className="px-4 py-2 text-gray-400 text-xs">{log.targetId ? `${log.targetType}#${log.targetId}` : "—"}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs max-w-xs truncate">{String(log.details ?? "")}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+                {(auditLog as unknown[]).length === 0 && <div className="text-center py-8 text-gray-500 text-sm">No audit log entries yet.</div>}
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {editingBowler && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl border border-yellow-500/30 p-6 w-full max-w-lg">
+            <h3 className="text-xl font-bold text-yellow-400 mb-4">Edit Bowler — {String(editingBowler.scantronId ?? "")}</h3>
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {(["legalFirstName", "legalLastName", "phone", "email"] as const).map((field) => (
+                <div key={field}>
+                  <label className="text-xs text-gray-400 mb-1 block capitalize">{field.replace(/([A-Z])/g, " $1")}</label>
+                  <input value={editFields[field] ?? ""} onChange={(e) => setEditFields({ ...editFields, [field]: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                </div>
+              ))}
+              <button onClick={() => setShowAllFields(!showAllFields)} className="text-xs text-cyan-400 hover:text-cyan-300 underline">
+                {showAllFields ? "Hide extended fields" : "Show hotel, payment, banquet, lane, notes..."}
+              </button>
+              {showAllFields && (
+                <>
+                  {(["checkinDate", "checkoutDate", "roomType", "roomNumber", "banquetAmount", "laneAssignment", "squadTime", "notes"] as const).map((field) => (
+                    <div key={field}>
+                      <label className="text-xs text-gray-400 mb-1 block capitalize">{field.replace(/([A-Z])/g, " $1")}</label>
+                      <input value={editFields[field] ?? ""} onChange={(e) => setEditFields({ ...editFields, [field]: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Registration Status Override</label>
+                    <select value={editFields.registrationStatus ?? ""} onChange={(e) => setEditFields({ ...editFields, registrationStatus: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500">
+                      <option value="">— no change —</option>
+                      <option value="pre_registered">Pre-Registered</option>
+                      <option value="signed_up">Signed Up</option>
+                      <option value="verified">Verified</option>
+                      <option value="checked_in">Checked In</option>
+                      <option value="unmatched">Unmatched</option>
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => updateBowler.mutate({ id: editingBowler.id as number, fields: editFields, actorRole: "EventDirector" })}
+                disabled={updateBowler.isPending}
+                className="flex-1 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg transition-colors">
+                {updateBowler.isPending ? "Saving..." : "Save Changes"}
+              </button>
+              <button onClick={() => setEditingBowler(null)} className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,360 +1,317 @@
-import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-type SearchResult = {
-  id: number;
-  scantronId: string | null;
-  legalName: string;
-  preferredName: string | null;
-  phone: string;
-  status: string | null;
-  teamName: string | null;
-  teamCode: string | null;
-  centerName: string | null;
-  isCheckedIn: boolean;
-};
-
-function NeonHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <header
-      style={{
-        background: "rgba(0,0,0,0.9)",
-        borderBottom: "1px solid #00ffff44",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{ color: "#888", background: "none", border: "none", cursor: "pointer", fontSize: 20 }}
-      >
-        ←
-      </button>
-      <span style={{ fontSize: 22 }}>🚪</span>
-      <span
-        style={{
-          fontFamily: "'Orbitron', sans-serif",
-          color: "#00ffff",
-          textShadow: "0 0 10px #00ffff",
-          fontWeight: 700,
-          fontSize: "clamp(0.85rem, 2.5vw, 1rem)",
-          letterSpacing: "0.05em",
-        }}
-      >
-        DOORMAN CHECK-IN
-      </span>
-      <div
-        className="pulse-glow"
-        style={{
-          marginLeft: "auto",
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: "#00ff88",
-          boxShadow: "0 0 8px #00ff88",
-        }}
-      />
-    </header>
-  );
-}
+type BowlerResult = Record<string, unknown>;
 
 export default function DoormanCheckIn() {
-  const [, navigate] = useLocation();
-  const [query, setQuery] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [confirming, setConfirming] = useState<SearchResult | null>(null);
-  const [method, setMethod] = useState<"id" | "name" | "phone">("name");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [, setLocation] = useLocation();
+  const [designation, setDesignation] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [doormanId, setDoormanId] = useState<number>(0);
+  const [scannedToken, setScannedToken] = useState("");
+  const [checkInResult, setCheckInResult] = useState<{ success: boolean; message: string; bowlerName?: string } | null>(null);
+  const [showDenied, setShowDenied] = useState(false);
+  const [wristbandMode, setWristbandMode] = useState(false);
+  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [reentrySearch, setReentrySearch] = useState("");
+  const [reentryQuery, setReentryQuery] = useState("");
+  const [selectedBowler, setSelectedBowler] = useState<BowlerResult | null>(null);
+  const [reentryBowler, setReentryBowler] = useState<BowlerResult | null>(null);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+  const tokenInputRef = useRef<HTMLInputElement>(null);
 
-  const searchQuery = trpc.doorman.search.useQuery(
-    { query: searchTerm, eventId: 1 },
-    { enabled: searchTerm.length >= 2 }
+  const loginMutation = trpc.appAuth.doormanLogin.useMutation({
+    onSuccess: (data) => {
+      const d = data as Record<string, unknown>;
+      if (d.success) {
+        setLoggedIn(true);
+        setDoormanId(Number(d.doormanId ?? 0));
+        toast.success(`Welcome, ${designation}!`);
+      } else {
+        toast.error("Invalid credentials");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const searchQuery_q = trpc.bowlers.search.useQuery(
+    { query: searchQuery },
+    { enabled: searchQuery.length >= 2 }
+  );
+  const reentryQuery_q = trpc.bowlers.search.useQuery(
+    { query: reentryQuery },
+    { enabled: reentryQuery.length >= 2 }
   );
 
-  const checkIn = trpc.doorman.checkIn.useMutation({
-    onSuccess: () => {
-      toast.success(`✅ ${confirming?.legalName} checked in successfully!`);
-      setConfirming(null);
-      setQuery("");
-      setSearchTerm("");
-      searchQuery.refetch();
+  const validateToken = trpc.tokens.validate.useMutation({
+    onSuccess: (data: Record<string, unknown>) => {
+      if (data.success) {
+        setCheckInResult({ success: true, message: `ENTRY GRANTED`, bowlerName: String(data.bowlerName ?? "") });
+        setShowDenied(false);
+        toast.success("Check-in successful!");
+        setTimeout(() => setCheckInResult(null), 5000);
+      } else {
+        setCheckInResult({ success: false, message: `DENIED — ${data.error}` });
+        setShowDenied(true);
+        toast.error(String(data.error ?? "Invalid token"));
+        setTimeout(() => { setShowDenied(false); setCheckInResult(null); }, 4000);
+      }
     },
-    onError: (err) => {
-      toast.error(`Check-in failed: ${err.message}`);
+    onError: (e) => {
+      setCheckInResult({ success: false, message: `DENIED — ${e.message}` });
+      setShowDenied(true);
+      setTimeout(() => { setShowDenied(false); setCheckInResult(null); }, 4000);
     },
   });
 
-  const handleSearch = (val: string) => {
-    setQuery(val);
-    clearTimeout((window as any)._doormanTimer);
-    (window as any)._doormanTimer = setTimeout(() => setSearchTerm(val), 300);
-  };
+  const issueWristband = trpc.wristbands.issue.useMutation({
+    onSuccess: () => {
+      toast.success("Wristband issued. Remind guest of wristband policy.");
+      setWristbandMode(false);
+      setReentryBowler(null);
+      setReentrySearch("");
+      setReentryQuery("");
+    },
+    onError: (e: { message: string }) => toast.error(e.message),
+  });
 
-  const handleCheckIn = (bowler: SearchResult) => {
-    // Detect method from query
-    const detectedMethod: "id" | "name" | "phone" =
-      /^\d{10}$/.test(query) ? "id" : /^\d{7,}$/.test(query) ? "phone" : "name";
-    setMethod(detectedMethod);
-    setConfirming(bowler);
-  };
+  const denyWristband = trpc.wristbands.deny.useMutation({
+    onSuccess: () => {
+      toast.error("Re-entry denied and logged.");
+      setShowDenied(true);
+      setTimeout(() => setShowDenied(false), 3000);
+    },
+  });
 
-  const confirmCheckIn = () => {
-    if (!confirming) return;
-    checkIn.mutate({
-      bowlerId: confirming.id,
-      eventId: 1,
-      method,
-      doormanId: "doorman-station-1",
-    });
-  };
+  // Auto-focus token input after login
+  useEffect(() => {
+    if (loggedIn && tokenInputRef.current) {
+      tokenInputRef.current.focus();
+    }
+  }, [loggedIn]);
 
-  const results = searchQuery.data ?? [];
+  if (!loggedIn) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-4">
+        <div className="bg-[#1a1a1a] rounded-2xl border border-cyan-500/40 p-8 max-w-sm w-full shadow-[0_0_40px_rgba(0,255,255,0.1)]">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">🚪</div>
+            <h1 className="text-2xl font-black tracking-widest" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#00ffff", textShadow: "0 0 20px rgba(0,255,255,0.6)" }}>
+              DOORMAN LOGIN
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">Vegas Sweeps Funtime 2026</p>
+          </div>
+          <div className="space-y-3 mb-5">
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Designation</label>
+              <input value={designation} onChange={(e) => setDesignation(e.target.value.toUpperCase())} placeholder="e.g. DM1"
+                className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500 font-mono" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
+                onKeyDown={(e) => e.key === "Enter" && loginMutation.mutate({ designation, password })} />
+            </div>
+          </div>
+          <button onClick={() => loginMutation.mutate({ designation, password })}
+            disabled={loginMutation.isPending || !designation || !password}
+            className="w-full py-3 font-black rounded-xl text-lg transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #ffd700, #ffaa00)", color: "#000", boxShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
+            {loginMutation.isPending ? "Signing in..." : "🔐 Sign In"}
+          </button>
+          <button onClick={() => setLocation("/")} className="w-full mt-3 py-2 text-gray-500 hover:text-gray-300 text-sm transition-colors">← Back to Home</button>
+        </div>
+      </div>
+    );
+  }
+
+  const reentryBowlerData = (reentryQuery_q.data?.[0] ?? reentryBowler) as BowlerResult | null;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-      <NeonHeader onBack={() => navigate("/")} />
-
-      <div className="container" style={{ paddingTop: 28, paddingBottom: 48, maxWidth: 700 }}>
-        {/* Search Box */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ position: "relative" }}>
-            <input
-              ref={inputRef}
-              className="neon-input"
-              value={query}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="🔍  Name, phone number, or 10-digit scantron ID..."
-              style={{ fontSize: "1.05rem", padding: "14px 16px" }}
-              autoFocus
-            />
-            {query && (
-              <button
-                onClick={() => { setQuery(""); setSearchTerm(""); inputRef.current?.focus(); }}
-                style={{
-                  position: "absolute",
-                  right: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  color: "#666",
-                  cursor: "pointer",
-                  fontSize: 18,
-                }}
-              >
-                ×
-              </button>
-            )}
+    <div className="min-h-screen bg-[#0d0d0d] text-white relative">
+      {/* DENIED FLASH OVERLAY */}
+      {showDenied && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+          style={{ animation: "deniedFlash 0.4s ease-in-out 3", background: "rgba(220,0,0,0.15)" }}>
+          <div className="text-center">
+            <div className="text-8xl font-black text-red-500 tracking-widest" style={{ textShadow: "0 0 40px rgba(255,0,0,0.9), 0 0 80px rgba(255,0,0,0.5)" }}>
+              ⛔ DENIED
+            </div>
+            {checkInResult && <div className="text-red-300 text-xl mt-2 font-semibold">{checkInResult.message}</div>}
           </div>
-          <div style={{ color: "#555", fontSize: "0.78rem", marginTop: 6 }}>
-            Search by full name, 10-digit ID, or phone number
+        </div>
+      )}
+
+      {/* GRANTED FLASH */}
+      {checkInResult?.success && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+          style={{ background: "rgba(0,200,0,0.08)" }}>
+          <div className="text-center bg-[#0a1a0a] border-2 border-green-500 rounded-3xl px-10 py-8 shadow-[0_0_60px_rgba(0,255,0,0.4)]">
+            <div className="text-7xl font-black text-green-400 tracking-widest" style={{ textShadow: "0 0 30px rgba(0,255,0,0.8)" }}>
+              ✅ GRANTED
+            </div>
+            <div className="text-green-300 text-2xl mt-2 font-bold">{checkInResult.bowlerName}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/30 px-4 py-4 sticky top-0 z-40">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="font-bold" style={{ color: "#00ffff" }}>{designation}</span>
+            <span className="text-gray-600">|</span>
+            <h1 className="text-xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 15px rgba(255,215,0,0.5)" }}>
+              🚪 DOORMAN CHECK-IN
+            </h1>
+          </div>
+          <button onClick={() => setWristbandMode(!wristbandMode)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${wristbandMode ? "bg-green-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}>
+            {wristbandMode ? "✅ Wristband Mode ON" : "🔄 Reentry Mode"}
+          </button>
+        </div>
+      </div>
+
+      {/* Persistent Reminder Panel */}
+      {!reminderDismissed && (
+        <div className="bg-yellow-900/30 border-b border-yellow-500/40 px-4 py-3">
+          <div className="max-w-3xl mx-auto flex items-start justify-between gap-3">
+            <div className="text-xs text-yellow-300 leading-relaxed">
+              <strong>⚠️ DOORMAN CHECKLIST:</strong> (1) Verify government-issued photo ID matches name on record. (2) Check wristband condition — if damaged, tampered, or appears swapped, deny re-entry immediately. (3) When issuing wristbands, verbally state: <em>"This wristband is issued ONE TIME ONLY. Tampering or swapping means DENIED re-entry. No exceptions."</em>
+            </div>
+            <button onClick={() => setReminderDismissed(true)} className="text-yellow-500 hover:text-yellow-300 text-xs shrink-0">Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        {/* QR Scan / Token Entry */}
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5">
+          <h2 className="text-sm font-semibold text-gray-400 mb-3">QR Code / Bluetooth Scanner / Manual Token</h2>
+          <p className="text-xs text-gray-600 mb-3">Bluetooth HID scanners auto-input here. Camera scan or type token manually.</p>
+          <div className="flex gap-3">
+            <input ref={tokenInputRef} value={scannedToken} onChange={(e) => setScannedToken(e.target.value)}
+              placeholder="Scan QR or enter token..."
+              className="flex-1 px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500 font-mono"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && scannedToken) {
+                  validateToken.mutate({ tokenValue: scannedToken, method: "QR", doormanId: doormanId || undefined });
+                  setScannedToken("");
+                }
+              }} />
+            <button onClick={() => { if (!scannedToken) return; validateToken.mutate({ tokenValue: scannedToken, method: "QR", doormanId: doormanId || undefined }); setScannedToken(""); }}
+              disabled={validateToken.isPending || !scannedToken}
+              className="px-5 py-2 font-black rounded-lg text-sm transition-all active:scale-95 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #ffd700, #ffaa00)", color: "#000", boxShadow: "0 0 15px rgba(255,215,0,0.3)" }}>
+              {validateToken.isPending ? "..." : "SCAN"}
+            </button>
           </div>
         </div>
 
-        {/* Confirmation Modal */}
-        {confirming && (
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.85)",
-              zIndex: 100,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 20,
-            }}
-          >
-            <div
-              className="neon-card strike-in"
-              style={{ padding: "36px 32px", maxWidth: 440, width: "100%", textAlign: "center" }}
-            >
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🎳</div>
-              <h2
-                style={{
-                  fontFamily: "'Orbitron', sans-serif",
-                  color: "#ffd700",
-                  textShadow: "0 0 10px #ffd70088",
-                  fontSize: "1.1rem",
-                  marginBottom: 6,
-                }}
-              >
-                CONFIRM CHECK-IN
-              </h2>
-              <div
-                style={{
-                  background: "rgba(0,0,0,0.6)",
-                  border: "1px solid #ffd70033",
-                  borderRadius: 10,
-                  padding: "20px 24px",
-                  margin: "20px 0",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ color: "#eee", fontSize: "1.15rem", fontWeight: 700, marginBottom: 8 }}>
-                  {confirming.legalName}
-                  {confirming.preferredName && confirming.preferredName !== confirming.legalName && (
-                    <span style={{ color: "#888", fontWeight: 400, fontSize: "0.9rem", marginLeft: 8 }}>
-                      "{confirming.preferredName}"
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px", fontSize: "0.85rem" }}>
-                  <div>
-                    <span style={{ color: "#555" }}>ID: </span>
-                    <span
-                      style={{
-                        color: "#ffd700",
-                        fontFamily: "'Orbitron', monospace",
-                        fontSize: "0.78rem",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {confirming.scantronId ?? "—"}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: "#555" }}>Phone: </span>
-                    <span style={{ color: "#ccc" }}>{confirming.phone}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "#555" }}>Team: </span>
-                    <span style={{ color: "#ccc" }}>{confirming.teamName ?? "—"}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "#555" }}>Center: </span>
-                    <span style={{ color: "#ccc" }}>{confirming.centerName ?? "—"}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                <button
-                  className="neon-btn-cyan"
-                  onClick={() => setConfirming(null)}
-                  style={{ flex: 1 }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="neon-btn-gold"
-                  onClick={confirmCheckIn}
-                  disabled={checkIn.isPending}
-                  style={{ flex: 2, fontSize: "1rem" }}
-                >
-                  {checkIn.isPending ? "Checking in..." : "✅ Confirm Check-In"}
-                </button>
-              </div>
-            </div>
+        {/* Name/Phone/ID Search */}
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5">
+          <h2 className="text-sm font-semibold text-gray-400 mb-3">Search by Name, Phone, or Scantron ID</h2>
+          <div className="flex gap-3 mb-3">
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setSearchQuery(e.target.value); }}
+              placeholder="Name, phone, or 9-digit ID..."
+              className="flex-1 px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500" />
           </div>
-        )}
-
-        {/* Results */}
-        {searchTerm.length >= 2 && (
-          <div>
-            {searchQuery.isLoading ? (
-              <div style={{ color: "#555", textAlign: "center", padding: 32 }}>Searching...</div>
-            ) : results.length === 0 ? (
-              <div
-                style={{
-                  background: "rgba(255,0,0,0.08)",
-                  border: "1px solid #ff444433",
-                  borderRadius: 10,
-                  padding: "24px",
-                  textAlign: "center",
-                  color: "#ff8888",
-                }}
-              >
-                <div style={{ fontSize: 32, marginBottom: 8 }}>❌</div>
-                No bowler found for "{searchTerm}"
-                <div style={{ color: "#555", fontSize: "0.8rem", marginTop: 6 }}>
-                  Try a different name, phone number, or 10-digit ID
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ color: "#555", fontSize: "0.8rem", marginBottom: 4 }}>
-                  {results.length} result{results.length !== 1 ? "s" : ""} found
-                </div>
-                {results.map((bowler) => (
-                  <div
-                    key={bowler.id}
-                    className="neon-card"
-                    style={{
-                      padding: "18px 20px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 16,
-                      flexWrap: "wrap",
-                      opacity: bowler.isCheckedIn ? 0.6 : 1,
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ color: "#eee", fontWeight: 700, fontSize: "1rem" }}>
-                        {bowler.legalName}
-                        {bowler.preferredName && bowler.preferredName !== bowler.legalName && (
-                          <span style={{ color: "#888", fontWeight: 400, fontSize: "0.85rem", marginLeft: 8 }}>
-                            "{bowler.preferredName}"
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ color: "#888", fontSize: "0.82rem", marginTop: 4 }}>
-                        {bowler.teamName && <span>{bowler.teamName} · </span>}
-                        {bowler.centerName && <span>{bowler.centerName}</span>}
-                      </div>
-                      <div style={{ display: "flex", gap: 16, marginTop: 6, flexWrap: "wrap" }}>
-                        {bowler.scantronId && (
-                          <span
-                            style={{
-                              fontFamily: "'Orbitron', monospace",
-                              fontSize: "0.75rem",
-                              color: "#ffd700",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            {bowler.scantronId}
-                          </span>
-                        )}
-                        <span style={{ color: "#666", fontSize: "0.8rem" }}>{bowler.phone}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      {bowler.isCheckedIn ? (
-                        <span className="badge-checked-in">✓ CHECKED IN</span>
-                      ) : (
-                        <button
-                          className="neon-btn-gold"
-                          onClick={() => handleCheckIn(bowler)}
-                          style={{ padding: "10px 20px", fontSize: "0.9rem" }}
-                        >
-                          Check In →
-                        </button>
-                      )}
-                    </div>
+          {(searchQuery_q.data ?? []).length > 0 && (
+            <div className="space-y-2">
+              {(searchQuery_q.data as BowlerResult[]).map((b) => (
+                <div key={String(b.id)} className="flex items-center justify-between p-3 bg-[#111] rounded-xl border border-white/10">
+                  <div>
+                    <div className="font-bold text-white">{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</div>
+                    <div className="text-xs text-gray-400">{String(b.centerName ?? "")} • {String(b.phone ?? "")}</div>
+                    <div className="text-xs font-mono" style={{ color: "#ffd700" }}>{String(b.scantronId ?? "")}</div>
                   </div>
-                ))}
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedBowler(b)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                      style={{ background: "#ffd700", color: "#000" }}>
+                      Check In
+                    </button>
+                    <button onClick={() => denyWristband.mutate({ bowlerId: b.id as number, eventId: 1, doormanId: doormanId || 0, reason: "Wristband Compromised" })}
+                      className="px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-bold transition-colors">
+                      🚫 Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Wristband / Reentry Mode */}
+        {wristbandMode && (
+          <div className="bg-[#1a1a1a] rounded-2xl border border-green-500/30 p-5">
+            <h2 className="text-sm font-semibold text-green-400 mb-1">🔄 Reentry Wristband Issuance</h2>
+            <div className="bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-3 mb-4 text-xs text-yellow-300">
+              ⚠️ <strong>MANDATORY DOORMAN PROMPT:</strong> Before issuing, verbally state to the guest: <em>"This wristband is issued ONE TIME ONLY. If it is damaged, tampered with, altered, or appears to have been swapped to another person, re-entry will be DENIED. No exceptions."</em> Confirm they understand before proceeding.
+            </div>
+            <div className="flex gap-3 mb-3">
+              <input value={reentrySearch} onChange={(e) => { setReentrySearch(e.target.value); setReentryQuery(e.target.value); }}
+                placeholder="Search bowler for wristband..."
+                className="flex-1 px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-green-500" />
+            </div>
+            {reentryBowlerData && (
+              <div className="p-4 bg-[#111] rounded-xl border border-green-500/30">
+                <div className="font-bold text-white mb-1">{String(reentryBowlerData.legalFirstName ?? "")} {String(reentryBowlerData.legalLastName ?? "")}</div>
+                <div className="text-xs text-gray-400 mb-1">{String(reentryBowlerData.centerName ?? "")} • {String(reentryBowlerData.phone ?? "")}</div>
+                <div className="text-xs font-mono text-yellow-400 mb-3">{String(reentryBowlerData.scantronId ?? "")}</div>
+                <div className="flex gap-3">
+                  <button onClick={() => issueWristband.mutate({ bowlerId: reentryBowlerData.id as number, eventId: 1, doormanId: doormanId || 0 })}
+                    disabled={issueWristband.isPending}
+                    className="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-sm transition-colors">
+                    {issueWristband.isPending ? "Issuing..." : "✅ Issue Wristband"}
+                  </button>
+                  <button onClick={() => denyWristband.mutate({ bowlerId: reentryBowlerData.id as number, eventId: 1, doormanId: doormanId || 0, reason: "Wristband Compromised" })}
+                    disabled={denyWristband.isPending}
+                    className="flex-1 py-2 bg-red-700 hover:bg-red-600 rounded-lg font-bold text-sm transition-colors">
+                    🚫 Deny — Wristband Compromised
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
+      </div>
 
-        {searchTerm.length < 2 && (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#333" }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>🎳</div>
-            <div style={{ fontSize: "0.95rem" }}>
-              Type at least 2 characters to search for a bowler
+      {/* Check-in Confirmation Modal */}
+      {selectedBowler && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl border border-yellow-500/40 p-6 max-w-sm w-full text-center shadow-[0_0_40px_rgba(255,215,0,0.15)]">
+            <div className="text-5xl mb-3">🎳</div>
+            <h3 className="text-xl font-black mb-1" style={{ color: "#ffd700" }}>Confirm Check-In</h3>
+            <div className="bg-[#111] rounded-xl p-4 mb-5">
+              <div className="font-bold text-white text-lg">{String(selectedBowler.legalFirstName ?? "")} {String(selectedBowler.legalLastName ?? "")}</div>
+              <div className="text-sm text-gray-400">{String(selectedBowler.centerName ?? "")} • Team {String(selectedBowler.teamCode ?? "")}</div>
+              <div className="font-mono text-sm mt-1" style={{ color: "#ffd700" }}>{String(selectedBowler.scantronId ?? "")}</div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => {
+                validateToken.mutate({ tokenValue: `MANUAL:${selectedBowler.id}`, method: "manual", doormanId: doormanId || undefined });
+                setSelectedBowler(null);
+              }} className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl font-black transition-colors">
+                ✅ GRANT ENTRY
+              </button>
+              <button onClick={() => setSelectedBowler(null)} className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors">Cancel</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes deniedFlash {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   );
 }

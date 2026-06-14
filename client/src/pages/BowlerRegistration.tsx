@@ -1,374 +1,178 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-function NeonHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <header
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        borderBottom: "1px solid #00ffff33",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{ color: "#888", background: "none", border: "none", cursor: "pointer", fontSize: 20 }}
-      >
-        ←
-      </button>
-      <span style={{ fontSize: 22 }}>📝</span>
-      <span
-        style={{
-          fontFamily: "'Orbitron', sans-serif",
-          color: "#00ffff",
-          textShadow: "0 0 10px #00ffff88",
-          fontWeight: 700,
-          fontSize: "clamp(0.85rem, 2.5vw, 1rem)",
-          letterSpacing: "0.05em",
-        }}
-      >
-        BOWLER REGISTRATION
-      </span>
-    </header>
-  );
-}
+type Center = Record<string, unknown>;
+type MatchResult = Record<string, unknown>;
 
 export default function BowlerRegistration() {
-  const [, navigate] = useLocation();
-
-  // Form state
-  const [legalName, setLegalName] = useState("");
-  const [preferredName, setPreferredName] = useState("");
+  const [, setLocation] = useLocation();
+  const EVENT_ID = 1;
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneLocked, setPhoneLocked] = useState(false);
+  const [centerId, setCenterId] = useState("");
+  const [matchResults, setMatchResults] = useState<MatchResult[] | null>(null);
+  const [selectedBowler, setSelectedBowler] = useState<MatchResult | null>(null);
   const [email, setEmail] = useState("");
-  const [leagueId, setLeagueId] = useState<number | "">("");
-  const [teamId, setTeamId] = useState<number | "">("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [scantronId, setScantronId] = useState<string | null>(null);
+  const [generatedId, setGeneratedId] = useState<string | null>(null);
 
-  // Pre-fill from URL params (captain deep-link)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const lc = params.get("league_id");
-    const tc = params.get("team_id");
-    if (lc) setLeagueId(Number(lc));
-    if (tc) setTeamId(Number(tc));
+    const t = params.get("team_id");
+    if (t) setCenterId(t);
   }, []);
 
-  const leaguesQuery = trpc.bowler.getLeagues.useQuery({ eventId: 1 });
-  const teamsQuery = trpc.bowler.getTeams.useQuery({ eventId: 1 });
+  const { data: centers = [] } = trpc.centers.list.useQuery();
 
-  const leagues = leaguesQuery.data ?? [];
-  const teams = teamsQuery.data ?? [];
-
-  // Filter teams by selected league
-  const filteredTeams = leagueId
-    ? teams.filter((t) => t.leagueId === Number(leagueId))
-    : teams;
-
-  const register = trpc.bowler.register.useMutation({
+  const matchMutation = trpc.bowlers.matchForSignup.useMutation({
     onSuccess: (data) => {
-      setScantronId(data.scantronId);
-      setSubmitted(true);
-      toast.success(`Registration complete! Your ID: ${data.scantronId}`);
+      const raw = data as unknown;
+      const results: MatchResult[] = Array.isArray(raw) ? (raw as MatchResult[]) : (raw && typeof raw === 'object' && 'bowler' in (raw as object) ? [(raw as { bowler: MatchResult }).bowler as MatchResult] : []);
+      setMatchResults(results);
+      if (results.length === 0) toast.info("No matching records found. Contact the Event Director.");
     },
-    onError: (err) => {
-      toast.error(`Registration failed: ${err.message}`);
-    },
+    onError: (e) => toast.error(e.message),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!leagueId || !teamId) {
-      toast.error("Please select a league and team.");
-      return;
-    }
-    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
-      toast.error("PIN must be exactly 6 digits.");
-      return;
-    }
-    register.mutate({
-      legalName,
-      preferredName: preferredName || undefined,
-      phone,
-      email: email || undefined,
-      leagueId: Number(leagueId),
-      teamId: Number(teamId),
-      pin,
-      eventId: 1,
-    });
+  const claimMutation = trpc.appAuth.claimBowler.useMutation({
+    onSuccess: (data) => {
+      const result = data as Record<string, unknown>;
+      setGeneratedId(String(result.scantronId ?? ""));
+      setSubmitted(true);
+      setPhoneLocked(true);
+      toast.success("Account created! Your bowler ID has been assigned.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleSearch = () => {
+    if (!firstName.trim() || !lastName.trim()) { toast.error("Enter first and last name."); return; }
+    matchMutation.mutate({ firstName, lastName, phone: phone || undefined, centerId: centerId ? Number(centerId) : 0, eventId: EVENT_ID });
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-      <NeonHeader onBack={() => navigate("/")} />
+  const handleClaim = () => {
+    if (!selectedBowler) return;
+    if (!email.trim() || !password.trim()) { toast.error("Email and password are required."); return; }
+    setPhoneLocked(true);
+    claimMutation.mutate({ bowlerId: selectedBowler.id as number, email, password, phone: phone || undefined });
+  };
 
-      <div
-        className="container"
-        style={{ paddingTop: 32, paddingBottom: 48, maxWidth: 640 }}
-      >
-        {/* Ad Banner */}
-        <div
-          style={{
-            background: "rgba(255,215,0,0.08)",
-            border: "1px dashed #ffd70044",
-            borderRadius: 8,
-            padding: "12px 20px",
-            textAlign: "center",
-            color: "#ffd700",
-            fontSize: "0.85rem",
-            marginBottom: 28,
-          }}
-        >
-          🎳 Strike Zone Pro Shop — Vegas Gear Up! <span style={{ color: "#555" }}>(Sponsor Slot)</span>
+  if (submitted && generatedId) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-4">
+        <div className="bg-[#1a1a1a] rounded-2xl border border-yellow-500/30 p-8 max-w-md w-full text-center">
+          <div className="text-6xl mb-4">🎳</div>
+          <h2 className="text-2xl font-black text-yellow-400 mb-2" style={{ textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>Registration Complete!</h2>
+          <p className="text-gray-400 mb-6">Your bowler ID has been assigned:</p>
+          <div className="bg-[#111] rounded-xl border border-yellow-500/50 p-4 mb-6">
+            <div className="font-mono text-3xl font-black text-yellow-400 tracking-widest" style={{ textShadow: "0 0 20px rgba(255,215,0,0.6)" }}>{generatedId}</div>
+            <p className="text-xs text-gray-500 mt-2">Save this number — it is your scantron ID</p>
+          </div>
+          <button onClick={() => setLocation("/")} className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl transition-all active:scale-95">Back to Home</button>
         </div>
+      </div>
+    );
+  }
 
-        {submitted && scantronId ? (
-          /* Success Screen */
-          <div
-            className="neon-card strike-in"
-            style={{ padding: 40, textAlign: "center" }}
-          >
-            <div style={{ fontSize: 56, marginBottom: 16 }}>🎳</div>
-            <h2
-              style={{
-                fontFamily: "'Orbitron', sans-serif",
-                color: "#00ff88",
-                textShadow: "0 0 12px #00ff8888",
-                fontSize: "1.4rem",
-                marginBottom: 8,
-              }}
-            >
-              REGISTRATION COMPLETE!
-            </h2>
-            <p style={{ color: "#aaa", marginBottom: 24 }}>
-              Your Vegas Sweeps spot is locked in.
-            </p>
-            <div
-              style={{
-                background: "rgba(0,0,0,0.6)",
-                border: "2px solid #ffd700",
-                borderRadius: 12,
-                padding: "20px 32px",
-                display: "inline-block",
-                marginBottom: 24,
-              }}
-            >
-              <div style={{ color: "#888", fontSize: "0.8rem", marginBottom: 6, letterSpacing: "0.1em" }}>
-                YOUR 10-DIGIT SCANTRON ID
+  return (
+    <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/30 px-4 py-4 sticky top-0 z-40">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
+          <span className="text-gray-600">|</span>
+          <h1 className="text-2xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>🎳 BOWLER SIGN-UP</h1>
+        </div>
+      </div>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        {!selectedBowler ? (
+          <div>
+            <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6 mb-5">
+              <h2 className="text-lg font-bold text-cyan-400 mb-1">Step 1: Find Your Record</h2>
+              <p className="text-gray-500 text-sm mb-5">Your registration was pre-loaded by the Event Director. Enter your information to locate your record.</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">First Name *</label>
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Last Name *</label>
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                </div>
               </div>
-              <div
-                style={{
-                  fontFamily: "'Orbitron', monospace",
-                  fontSize: "2rem",
-                  color: "#ffd700",
-                  textShadow: "0 0 16px #ffd700aa",
-                  letterSpacing: "0.15em",
-                  fontWeight: 900,
-                }}
-              >
-                {scantronId}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Phone (optional)</label>
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={phoneLocked} placeholder="Helps narrow results" className={`w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500 ${phoneLocked ? "opacity-60 cursor-not-allowed" : ""}`} />
+                  {phoneLocked && <p className="text-xs text-gray-500 mt-1">🔒 Phone locked</p>}
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Bowling Center (optional)</label>
+                  <select value={centerId} onChange={(e) => setCenterId(e.target.value)} className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500">
+                    <option value="">Any center</option>
+                    {(centers as Center[]).map((c) => (<option key={String(c.id)} value={String(c.id)}>{String(c.centerName)}</option>))}
+                  </select>
+                </div>
               </div>
-              <div style={{ color: "#555", fontSize: "0.72rem", marginTop: 8, letterSpacing: "0.05em" }}>
-                CC · L · EE · TT · BB FORMAT
-              </div>
+              <button onClick={handleSearch} disabled={matchMutation.isPending} className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-black rounded-xl transition-all active:scale-95">
+                {matchMutation.isPending ? "Searching..." : "🔍 Find My Record"}
+              </button>
             </div>
-            <div
-              style={{
-                background: "#ff000022",
-                border: "1px solid #ff444444",
-                borderRadius: 8,
-                padding: "10px 16px",
-                color: "#ff8888",
-                fontSize: "0.85rem",
-                marginBottom: 28,
-              }}
-            >
-              ⚠️ Memorize your PIN. Forgetting it risks event entry denial.
-            </div>
-            <button className="neon-btn-gold" onClick={() => navigate("/")}>
-              Return to Home
-            </button>
+            {matchResults !== null && (
+              <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
+                <h3 className="text-sm font-semibold text-gray-400 mb-3">{matchResults.length === 0 ? "No records found" : `${matchResults.length} record${matchResults.length !== 1 ? "s" : ""} found — select yours:`}</h3>
+                {matchResults.length === 0 ? (
+                  <p className="text-gray-500 text-sm">Your name was not found in the pre-registered list. Please contact the Event Director.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {matchResults.map((b) => (
+                      <button key={String(b.id)} onClick={() => setSelectedBowler(b)} className="w-full text-left p-4 bg-[#111] hover:bg-white/10 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-all">
+                        <div className="font-bold text-white">{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</div>
+                        <div className="text-sm text-gray-400 mt-0.5">{String(b.centerName ?? "")} • Team {String(b.teamCode ?? "")} — {String(b.teamName ?? "")}</div>
+                        <div className="text-xs text-yellow-400 mt-1 font-mono">{String(b.scantronId ?? "ID pending")}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
-          /* Registration Form */
-          <div className="neon-card" style={{ padding: "32px 28px" }}>
-            <h2
-              style={{
-                fontFamily: "'Orbitron', sans-serif",
-                color: "#ffd700",
-                textShadow: "0 0 10px #ffd70088",
-                fontSize: "1.1rem",
-                marginBottom: 6,
-                textAlign: "center",
-              }}
-            >
-              🎳 BOWLER REGISTRATION
-            </h2>
-            <p style={{ color: "#888", textAlign: "center", fontSize: "0.85rem", marginBottom: 28 }}>
-              Team Captains: ensure full team completion for Vegas!
-            </p>
-
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    Legal Name <span style={{ color: "#ff5555" }}>*</span>
-                    <span style={{ color: "#555", fontSize: "0.75rem", marginLeft: 6 }}>(must match government ID)</span>
-                  </label>
-                  <input
-                    className="neon-input"
-                    value={legalName}
-                    onChange={(e) => setLegalName(e.target.value)}
-                    required
-                    minLength={2}
-                    placeholder="Full legal name"
-                  />
+          <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-lg font-bold text-cyan-400 mb-1">Step 2: Create Your Account</h2>
+                <div className="mt-2 p-3 bg-[#111] rounded-xl border border-yellow-500/30">
+                  <div className="font-bold text-white">{String(selectedBowler.legalFirstName ?? "")} {String(selectedBowler.legalLastName ?? "")}</div>
+                  <div className="text-sm text-gray-400">{String(selectedBowler.centerName ?? "")} • Team {String(selectedBowler.teamCode ?? "")}</div>
+                  <div className="text-xs text-yellow-400 font-mono mt-1">{String(selectedBowler.scantronId ?? "")}</div>
                 </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    Preferred Name
-                  </label>
-                  <input
-                    className="neon-input"
-                    value={preferredName}
-                    onChange={(e) => setPreferredName(e.target.value)}
-                    placeholder="Nickname (optional)"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    Phone Number <span style={{ color: "#ff5555" }}>*</span>
-                    <span style={{ color: "#555", fontSize: "0.75rem", marginLeft: 6 }}>
-                      {submitted ? "🔒 Locked after registration" : "(locked after submission)"}
-                    </span>
-                  </label>
-                  <input
-                    className="neon-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                    pattern="[0-9]{10}"
-                    placeholder="10-digit phone number"
-                    readOnly={submitted}
-                    disabled={submitted}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    Email Address
-                  </label>
-                  <input
-                    className="neon-input"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="email@example.com (optional)"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    League <span style={{ color: "#ff5555" }}>*</span>
-                  </label>
-                  <select
-                    className="neon-input"
-                    value={leagueId}
-                    onChange={(e) => { setLeagueId(Number(e.target.value)); setTeamId(""); }}
-                    required
-                    style={{ cursor: "pointer" }}
-                  >
-                    <option value="">— Select League —</option>
-                    {leagues.map((l) => (
-                      <option key={l.id} value={l.id} style={{ background: "#222" }}>
-                        {l.centerName} — {l.leagueName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    Team <span style={{ color: "#ff5555" }}>*</span>
-                  </label>
-                  <select
-                    className="neon-input"
-                    value={teamId}
-                    onChange={(e) => setTeamId(Number(e.target.value))}
-                    required
-                    disabled={!leagueId}
-                    style={{ cursor: leagueId ? "pointer" : "not-allowed" }}
-                  >
-                    <option value="">— Select Team —</option>
-                    {filteredTeams.map((t) => (
-                      <option key={t.id} value={t.id} style={{ background: "#222" }}>
-                        {t.teamName} (#{t.teamCode})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ color: "#aaa", fontSize: "0.82rem", display: "block", marginBottom: 6 }}>
-                    6-Digit PIN <span style={{ color: "#ff5555" }}>*</span>
-                  </label>
-                  <input
-                    className="neon-input"
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    required
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    placeholder="6-digit numeric PIN"
-                  />
-                  <div style={{ color: "#ff8888", fontSize: "0.78rem", marginTop: 4 }}>
-                    ⚠️ Memorize this PIN — it is your safety net for event entry.
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="neon-btn-gold"
-                  disabled={register.isPending}
-                  style={{ width: "100%", padding: "14px", fontSize: "1rem", marginTop: 8 }}
-                >
-                  {register.isPending ? "Registering..." : "🎳 Submit & Lock Vegas Spot"}
-                </button>
               </div>
-            </form>
+              <button onClick={() => setSelectedBowler(null)} className="text-gray-500 hover:text-white text-sm">← Back</button>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Email *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Phone {phoneLocked ? "🔒 Locked" : "(will be locked after submission)"}</label>
+                <input value={phone} disabled={phoneLocked} onChange={(e) => setPhone(e.target.value)} className={`w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500 ${phoneLocked ? "opacity-60 cursor-not-allowed" : ""}`} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Password *</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+              </div>
+            </div>
+            <button onClick={handleClaim} disabled={claimMutation.isPending || !email || !password} className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black font-black rounded-xl transition-all active:scale-95">
+              {claimMutation.isPending ? "Creating Account..." : "✅ Claim My Bowler Record"}
+            </button>
           </div>
         )}
-
-        {/* Bottom Ad Banner */}
-        <div
-          style={{
-            background: "rgba(0,255,255,0.05)",
-            border: "1px dashed #00ffff33",
-            borderRadius: 8,
-            padding: "12px 20px",
-            textAlign: "center",
-            color: "#00ffff",
-            fontSize: "0.85rem",
-            marginTop: 24,
-          }}
-        >
-          🎯 Bowl Like a Pro in Vegas — Local Alley Deals <span style={{ color: "#555" }}>(Sponsor Slot)</span>
-        </div>
       </div>
     </div>
   );

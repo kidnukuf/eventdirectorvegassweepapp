@@ -1,336 +1,145 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-function NeonHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <header
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        borderBottom: "1px solid #00ffff33",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{ color: "#888", background: "none", border: "none", cursor: "pointer", fontSize: 20 }}
-      >
-        ←
-      </button>
-      <span style={{ fontSize: 22 }}>🎳</span>
-      <span
-        style={{
-          fontFamily: "'Orbitron', sans-serif",
-          color: "#00ffff",
-          textShadow: "0 0 10px #00ffff88",
-          fontWeight: 700,
-          fontSize: "clamp(0.85rem, 2.5vw, 1rem)",
-          letterSpacing: "0.05em",
-        }}
-      >
-        TEAM CAPTAIN DASHBOARD
-      </span>
-    </header>
-  );
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (status === "checked_in") return <span className="badge-checked-in">CHECKED IN</span>;
-  if (status === "registered") return <span className="badge-registered">REGISTERED</span>;
-  return <span className="badge-pending">PENDING</span>;
-}
+type Team = Record<string, unknown>;
+type Member = Record<string, unknown>;
 
 export default function TeamCaptain() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
+  const EVENT_ID = 1;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [captainCode, setCaptainCode] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
-  const teamsQuery = trpc.captain.getAllTeams.useQuery({ eventId: 1 });
-  const teamQuery = trpc.captain.getTeam.useQuery(
-    { teamId: selectedTeamId ?? 0, eventId: 1 },
-    { enabled: selectedTeamId !== null }
-  );
+  const { data: teams = [] } = trpc.teams.listByEvent.useQuery({ eventId: EVENT_ID });
+  const { data: teamData } = trpc.teams.getWithMembers.useQuery({ teamId: selectedTeamId! }, { enabled: !!selectedTeamId && authenticated });
 
-  const teams = teamsQuery.data ?? [];
-  const team = teamQuery.data;
+  const verifyMutation = trpc.teams.verifyCaptain.useMutation({
+    onSuccess: (data) => {
+      const d = data as Record<string, unknown>;
+      if (d.success) { setAuthenticated(true); toast.success("Captain verified!"); }
+      else toast.error("Invalid captain code");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
-  const members = team?.members ?? [];
-  const completed = members.filter((m) => m.status === "registered" || m.status === "checked_in").length;
-  const completionPct = members.length > 0 ? Math.round((completed / members.length) * 100) : 0;
+  const verifyMember = trpc.teams.verifyMember.useMutation({
+    onSuccess: () => { toast.success("Member verified!"); },
+    onError: (e) => toast.error(e.message),
+  });
 
-  const generateLink = () => {
-    if (!selectedTeamId || !team) return;
-    const league = teams.find((t) => t.id === selectedTeamId);
-    const url = `${window.location.origin}/register?league_id=${league?.leagueId ?? ""}&team_id=${selectedTeamId}`;
-    navigator.clipboard
-      .writeText(url)
-      .then(() => toast.success("Registration link copied to clipboard!"))
-      .catch(() => toast.info(`Share this link: ${url}`));
+  const copyLink = () => {
+    if (!selectedTeamId) return;
+    const url = `${window.location.origin}/register?team_id=${selectedTeamId}`;
+    navigator.clipboard.writeText(url).then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); toast.success("Registration link copied!"); });
   };
 
-  const sendReminders = () => {
-    const pending = members.filter((m) => m.status === "pending");
-    if (pending.length === 0) {
-      toast.success("All team members are registered!");
-    } else {
-      toast.info(`Reminder sent to ${pending.length} incomplete member${pending.length !== 1 ? "s" : ""}.`);
-    }
-  };
+  const members = (teamData as Record<string, unknown>)?.members as Member[] ?? [];
+  const team = (teamData as Record<string, unknown>)?.team as Team ?? null;
+  const completedCount = members.filter((m: Member) => m.registrationStatus === "verified" || m.registrationStatus === "checked_in").length;
+
+  if (!authenticated) {
+    return (
+      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-4">
+        <div className="neon-card p-8 max-w-sm w-full neon-border-gold">
+          <div className="text-center mb-6">
+            <div className="text-5xl mb-3">🎳</div>
+            <h1 className="text-2xl font-black neon-gold tracking-widest">TEAM CAPTAIN</h1>
+            <p className="text-gray-500 text-sm mt-1">Select your team and enter your captain code</p>
+          </div>
+          <div className="space-y-3 mb-5">
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Select Your Team</label>
+              <select value={selectedTeamId ?? ""} onChange={(e) => setSelectedTeamId(Number(e.target.value))} className="neon-input">
+                <option value="">— Select Team —</option>
+                {(teams as Team[]).map((t) => (<option key={String(t.id)} value={String(t.id)}>{String(t.teamName ?? "")} (#{String(t.teamCode ?? "")})</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Captain Code</label>
+              <input type="password" value={captainCode} onChange={(e) => setCaptainCode(e.target.value)} className="neon-input" onKeyDown={(e) => e.key === "Enter" && selectedTeamId && verifyMutation.mutate({ teamId: selectedTeamId, captainCode })} />
+            </div>
+          </div>
+          <button onClick={() => selectedTeamId && verifyMutation.mutate({ teamId: selectedTeamId, captainCode })} disabled={verifyMutation.isPending || !selectedTeamId || !captainCode} className="neon-btn-gold w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+            {verifyMutation.isPending ? "Verifying..." : "🔐 Access Team Dashboard"}
+          </button>
+          <button onClick={() => setLocation("/")} className="w-full mt-3 py-2 text-gray-500 hover:text-gray-300 text-sm transition-colors">← Back to Home</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-      <NeonHeader onBack={() => navigate("/")} />
+    <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="bg-[#1a1a1a] border-b border-green-500/30 px-4 py-4 sticky top-0 z-40">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
+            <h1 className="text-xl font-black text-green-400" style={{ textShadow: "0 0 15px rgba(34,197,94,0.5)" }}>🎳 TEAM CAPTAIN</h1>
+          </div>
+          <button onClick={copyLink} className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${linkCopied ? "bg-green-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}>
+            {linkCopied ? "✅ Copied!" : "📋 Copy Reg Link"}
+          </button>
+        </div>
+      </div>
 
-      <div className="container" style={{ paddingTop: 28, paddingBottom: 48 }}>
-        {/* Team Selector */}
-        <div style={{ marginBottom: 28 }}>
-          <label style={{ color: "#aaa", fontSize: "0.85rem", display: "block", marginBottom: 8 }}>
-            Select Your Team
-          </label>
-          <select
-            className="neon-input"
-            value={selectedTeamId ?? ""}
-            onChange={(e) => setSelectedTeamId(Number(e.target.value) || null)}
-            style={{ maxWidth: 480, cursor: "pointer" }}
-          >
-            <option value="">— Choose a team —</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id} style={{ background: "#222" }}>
-                {t.teamName} (#{t.teamCode}) — {t.centerName}
-              </option>
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        {team && (
+          <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5 mb-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="text-xl font-black text-white">{String(team.teamName ?? "")}</h2>
+                <p className="text-gray-400 text-sm">{String(team.centerName ?? "")} • Team #{String(team.teamCode ?? "")}</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-black text-green-400">{completedCount}/{members.length}</div>
+                <div className="text-xs text-gray-500">Verified</div>
+              </div>
+            </div>
+            <div className="mt-4 h-2 bg-[#111] rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-500 rounded-full" style={{ width: members.length > 0 ? `${(completedCount / members.length) * 100}%` : "0%" }} />
+            </div>
+          </div>
+        )}
+
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/10">
+            <h3 className="font-semibold text-gray-300">Team Roster</h3>
+          </div>
+          <div className="divide-y divide-white/5">
+            {members.map((m: Member, i: number) => (
+              <div key={String(m.id)} className="px-5 py-4 flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-white">{m.isCapitain ? "⭐ " : ""}{String(m.legalFirstName ?? "")} {String(m.legalLastName ?? "")}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Position {i + 1} • {String(m.scantronId ?? "ID pending")}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.registrationStatus === "verified" || m.registrationStatus === "checked_in" ? "bg-green-900 text-green-300" : m.registrationStatus === "signed_up" ? "bg-blue-900 text-blue-300" : "bg-gray-700 text-gray-400"}`}>
+                    {String(m.registrationStatus ?? "pre_registered")}
+                  </span>
+                  {m.registrationStatus === "signed_up" && (
+                    <button onClick={() => verifyMember.mutate({ bowlerId: m.id as number, captainTeamId: selectedTeamId! })} className="px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-xs transition-colors">Verify</button>
+                  )}
+                </div>
+              </div>
             ))}
-          </select>
+            {members.length === 0 && <div className="px-5 py-8 text-center text-gray-500 text-sm">No members found for this team.</div>}
+          </div>
         </div>
 
-        {selectedTeamId && team && (
-          <div className="strike-in">
-            {/* Team Header Card */}
-            <div
-              className="neon-card"
-              style={{ padding: "24px 28px", marginBottom: 20 }}
-            >
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <h2
-                    style={{
-                      fontFamily: "'Orbitron', sans-serif",
-                      color: "#ffd700",
-                      textShadow: "0 0 10px #ffd70088",
-                      fontSize: "1.2rem",
-                      margin: 0,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {team.teamName}
-                  </h2>
-                  <div style={{ color: "#888", fontSize: "0.85rem" }}>
-                    Team #{team.teamCode}
-                    {team.captainName && (
-                      <span style={{ marginLeft: 12 }}>Captain: {team.captainName}</span>
-                    )}
-                  </div>
-                  {(team.laneNumber || team.timeSlot) && (
-                    <div style={{ color: "#00ffff", fontSize: "0.85rem", marginTop: 4 }}>
-                      {team.laneNumber && `Lane ${team.laneNumber}`}
-                      {team.laneNumber && team.timeSlot && " · "}
-                      {team.timeSlot && `Squad ${team.timeSlot}`}
-                    </div>
-                  )}
-                </div>
-
-                {/* Completion Ring */}
-                <div style={{ textAlign: "center" }}>
-                  <div
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: `conic-gradient(#00ff88 ${completionPct * 3.6}deg, #333 0deg)`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: "50%",
-                        background: "#111",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexDirection: "column",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#00ff88",
-                          fontFamily: "'Orbitron', sans-serif",
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                        }}
-                      >
-                        {completionPct}%
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ color: "#888", fontSize: "0.75rem", marginTop: 6 }}>
-                    {completed}/{members.length} Complete
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
-                <button className="neon-btn-cyan" onClick={sendReminders}>
-                  📲 Send Reminders
-                </button>
-                <button className="neon-btn-gold" onClick={generateLink}>
-                  🔗 Copy Registration Link
-                </button>
-              </div>
-            </div>
-
-            {/* Ad Banner */}
-            <div
-              style={{
-                background: "rgba(255,215,0,0.06)",
-                border: "1px dashed #ffd70033",
-                borderRadius: 8,
-                padding: "10px 16px",
-                textAlign: "center",
-                color: "#ffd700",
-                fontSize: "0.8rem",
-                marginBottom: 20,
-              }}
-            >
-              🎳 Bowl Like a Pro in Vegas — Local Alley Deals <span style={{ color: "#555" }}>(Sponsor Slot)</span>
-            </div>
-
-            {/* Roster Table */}
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  background: "rgba(0,0,0,0.5)",
-                  borderRadius: 10,
-                  overflow: "hidden",
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "rgba(0,0,0,0.8)", borderBottom: "1px solid #ffd70033" }}>
-                    {["Pos", "Name", "Phone", "Status", "Scantron ID"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "12px 14px",
-                          textAlign: "left",
-                          color: "#00ffff",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamQuery.isLoading ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        Loading roster...
-                      </td>
-                    </tr>
-                  ) : members.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#555" }}>
-                        No members registered yet.{" "}
-                        <button
-                          onClick={generateLink}
-                          style={{ color: "#00ffff", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
-                        >
-                          Copy registration link
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    members.map((m, i) => (
-                      <tr
-                        key={m.id}
-                        style={{
-                          borderBottom: "1px solid #ffffff08",
-                          background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding: "11px 14px",
-                            color: "#ffd700",
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: "0.85rem",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {m.bowlerPosition}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#eee" }}>
-                          <div style={{ fontWeight: 600 }}>{m.legalName}</div>
-                          {m.preferredName && m.preferredName !== m.legalName && (
-                            <div style={{ color: "#888", fontSize: "0.78rem" }}>"{m.preferredName}"</div>
-                          )}
-                        </td>
-                        <td style={{ padding: "11px 14px", color: "#aaa", fontSize: "0.85rem" }}>
-                          {m.phone}
-                        </td>
-                        <td style={{ padding: "11px 14px" }}>
-                          <StatusBadge status={m.status} />
-                        </td>
-                        <td
-                          style={{
-                            padding: "11px 14px",
-                            fontFamily: "'Orbitron', monospace",
-                            fontSize: "0.78rem",
-                            color: m.scantronId ? "#ffd700" : "#555",
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          {m.scantronId ?? "—"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {!selectedTeamId && !teamsQuery.isLoading && (
-          <div
-            style={{
-              textAlign: "center",
-              color: "#555",
-              padding: "60px 20px",
-              fontSize: "0.95rem",
-            }}
-          >
-            Select a team above to view the roster and manage registration.
-          </div>
-        )}
+        <div className="mt-5 bg-[#1a1a1a] rounded-2xl border border-yellow-500/20 p-5">
+          <h3 className="text-sm font-semibold text-yellow-400 mb-2">📋 Team Captain Responsibilities</h3>
+          <ul className="text-xs text-gray-400 space-y-1.5">
+            <li>• Ensure all team members complete their sign-up before the event</li>
+            <li>• Verify each member once they have signed up (click Verify button above)</li>
+            <li>• Share the registration link with any members who have not signed up yet</li>
+            <li>• Contact the Event Director if a member cannot be found in the system</li>
+            <li>• All team members must be present and checked in at the door for the team to bowl</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

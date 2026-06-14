@@ -1,192 +1,85 @@
-import { useLocation, useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useLocation, useParams } from "wouter";
 
-function NeonHeader({ onBack }: { onBack: () => void }) {
-  return (
-    <header
-      style={{
-        background: "rgba(0,0,0,0.85)",
-        borderBottom: "1px solid #ffd70033",
-        padding: "14px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        backdropFilter: "blur(8px)",
-      }}
-    >
-      <button
-        onClick={onBack}
-        style={{ color: "#888", background: "none", border: "none", cursor: "pointer", fontSize: 20 }}
-      >
-        ←
-      </button>
-      <span style={{ fontSize: 22 }}>🎳</span>
-      <span
-        style={{
-          fontFamily: "'Orbitron', sans-serif",
-          color: "#ffd700",
-          textShadow: "0 0 10px #ffd70088",
-          fontWeight: 700,
-          fontSize: "clamp(0.85rem, 2.5vw, 1rem)",
-          letterSpacing: "0.05em",
-        }}
-      >
-        BOWLER PROFILE
-      </span>
-    </header>
-  );
-}
+type Bowler = Record<string, unknown>;
 
 export default function BowlerProfile() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
-  const bowlerId = parseInt(params.id ?? "0", 10);
+  const bowlerId = Number(params.id);
 
-  const bowlerQuery = trpc.bowler.getById.useQuery({ id: bowlerId }, { enabled: bowlerId > 0 });
-  const bowler = bowlerQuery.data;
+  const { data: bowler, isLoading } = trpc.bowlers.getById.useQuery({ id: bowlerId }, { enabled: !!bowlerId });
+  const { data: tokenData } = trpc.tokens.getForBowler.useQuery({ bowlerId }, { enabled: !!bowlerId });
 
-  if (bowlerQuery.isLoading) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#555" }}>Loading...</div>
-      </div>
-    );
-  }
+  const b = bowler as Bowler | undefined;
 
-  if (!bowler) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-        <NeonHeader onBack={() => navigate("/")} />
-        <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
-          Bowler not found.
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return (
+    <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+      <div className="text-gray-500">Loading profile...</div>
+    </div>
+  );
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#1a1a1a" }}>
-      <NeonHeader onBack={() => navigate("/")} />
-
-      <div className="container" style={{ paddingTop: 32, paddingBottom: 48, maxWidth: 640 }}>
-        <div className="neon-card strike-in" style={{ padding: "36px 32px" }}>
-          {/* ID Badge */}
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div
-              style={{
-                background: "rgba(0,0,0,0.7)",
-                border: "2px solid #ffd700",
-                borderRadius: 14,
-                padding: "20px 32px",
-                display: "inline-block",
-              }}
-            >
-              <div style={{ color: "#555", fontSize: "0.75rem", letterSpacing: "0.12em", marginBottom: 6 }}>
-                10-DIGIT SCANTRON ID
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Orbitron', monospace",
-                  fontSize: "2rem",
-                  color: "#ffd700",
-                  textShadow: "0 0 16px #ffd700aa",
-                  letterSpacing: "0.15em",
-                  fontWeight: 900,
-                }}
-              >
-                {bowler.scantronId ?? "—"}
-              </div>
-              <div style={{ color: "#444", fontSize: "0.7rem", marginTop: 6, letterSpacing: "0.05em" }}>
-                CC · L · EE · TT · BB
-              </div>
-            </div>
-          </div>
-
-          {/* Bowler Info */}
-          <div style={{ display: "grid", gap: 16 }}>
-            <InfoRow label="Legal Name" value={bowler.legalName} highlight />
-            {bowler.preferredName && bowler.preferredName !== bowler.legalName && (
-              <InfoRow label="Preferred Name" value={bowler.preferredName} />
-            )}
-            <InfoRow label="Phone" value={bowler.phone} />
-            {bowler.email && <InfoRow label="Email" value={bowler.email} />}
-            <InfoRow label="Team" value={`${bowler.teamName ?? "—"} (#${bowler.teamCode ?? "—"})`} />
-            <InfoRow label="League" value={bowler.leagueName ?? "—"} />
-            <InfoRow label="Center" value={bowler.centerName ?? "—"} />
-            {bowler.laneNumber && <InfoRow label="Lane" value={String(bowler.laneNumber)} />}
-            {bowler.timeSlot && <InfoRow label="Squad" value={bowler.timeSlot} />}
-            <InfoRow
-              label="Status"
-              value={bowler.status ?? "—"}
-              badge
-            />
-          </div>
-
-          <div style={{ marginTop: 32, textAlign: "center" }}>
-            <button className="neon-btn-gold" onClick={() => navigate("/")}>
-              Return to Home
-            </button>
-          </div>
-        </div>
+  if (!b) return (
+    <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-4">
+      <div className="text-center">
+        <div className="text-5xl mb-4">🎳</div>
+        <p className="text-gray-400 mb-4">Bowler not found.</p>
+        <button onClick={() => setLocation("/")} className="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg">Back to Home</button>
       </div>
     </div>
   );
-}
 
-function InfoRow({
-  label,
-  value,
-  highlight,
-  badge,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-  badge?: boolean;
-}) {
+  const token = tokenData as Record<string, unknown> | undefined;
+
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        borderBottom: "1px solid #ffffff0a",
-        paddingBottom: 12,
-        gap: 12,
-        flexWrap: "wrap",
-      }}
-    >
-      <span style={{ color: "#666", fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-        {label}
-      </span>
-      {badge ? (
-        <span
-          className={
-            value === "checked_in"
-              ? "badge-checked-in"
-              : value === "registered"
-              ? "badge-registered"
-              : "badge-pending"
-          }
-          style={{ textTransform: "uppercase" }}
-        >
-          {value.replace("_", " ")}
-        </span>
-      ) : (
-        <span
-          style={{
-            color: highlight ? "#ffd700" : "#ccc",
-            fontWeight: highlight ? 700 : 400,
-            fontSize: "0.95rem",
-            textShadow: highlight ? "0 0 8px #ffd70066" : "none",
-          }}
-        >
-          {value}
-        </span>
-      )}
+    <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="bg-[#1a1a1a] border-b border-yellow-500/30 px-4 py-4">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
+          <h1 className="text-xl font-black text-yellow-400" style={{ textShadow: "0 0 15px rgba(255,215,0,0.5)" }}>🎳 MY PROFILE</h1>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-black text-white">{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</h2>
+              <p className="text-gray-400 text-sm mt-1">{String(b.centerName ?? "")} • Team {String(b.teamCode ?? "")} — {String(b.teamName ?? "")}</p>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${b.registrationStatus === "checked_in" ? "bg-yellow-900 text-yellow-300" : b.registrationStatus === "verified" ? "bg-green-900 text-green-300" : "bg-gray-700 text-gray-400"}`}>
+              {String(b.registrationStatus ?? "pre_registered")}
+            </span>
+          </div>
+          <div className="bg-[#111] rounded-xl p-4 border border-yellow-500/30 text-center">
+            <div className="text-xs text-gray-500 mb-1">YOUR SCANTRON ID</div>
+            <div className="font-mono text-2xl font-black text-yellow-400 tracking-widest" style={{ textShadow: "0 0 15px rgba(255,215,0,0.5)" }}>
+              {String(b.scantronId ?? "Pending")}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">CC · L · EE · TT · BB</div>
+          </div>
+        </div>
+
+        {token != null && Boolean((token as Record<string, unknown>).qrDataUrl) && (
+          <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-6 text-center">
+            <h3 className="text-sm font-semibold text-gray-400 mb-4">Your Event QR Code</h3>
+            <img src={String((token as Record<string, unknown>).qrDataUrl)} alt="QR Code" className="mx-auto rounded-xl border-2 border-yellow-500/30" style={{ width: 200 }} />
+            <p className="text-xs text-gray-500 mt-3">Present this at the door for entry. Valid one-time use only.</p>
+          </div>
+        )}
+
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3">Event Details</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><span className="text-gray-500">Center:</span> <span className="text-white">{String(b.centerName ?? "—")}</span></div>
+            <div><span className="text-gray-500">Team:</span> <span className="text-white">{String(b.teamName ?? "—")}</span></div>
+            <div><span className="text-gray-500">Hotel Check-In:</span> <span className="text-white">{String(b.checkinDate ?? "—")}</span></div>
+            <div><span className="text-gray-500">Room:</span> <span className="text-white">{String(b.roomType ?? "—")}</span></div>
+            <div><span className="text-gray-500">Banquet:</span> <span className="text-white">{b.banquetAmount ? `$${b.banquetAmount}` : "—"}</span></div>
+            <div><span className="text-gray-500">Captain:</span> <span className="text-white">{b.isCapitain ? "Yes ⭐" : "No"}</span></div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

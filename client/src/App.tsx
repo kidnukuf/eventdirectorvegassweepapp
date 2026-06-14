@@ -10,6 +10,7 @@ import BowlerRegistration from "./pages/BowlerRegistration";
 import TeamCaptain from "./pages/TeamCaptain";
 import DoormanCheckIn from "./pages/DoormanCheckIn";
 import BowlerProfile from "./pages/BowlerProfile";
+import ImportData from "./pages/ImportData";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/captain" component={TeamCaptain} />
       <Route path="/doorman" component={DoormanCheckIn} />
       <Route path="/bowler/:id" component={BowlerProfile} />
+      <Route path="/import" component={ImportData} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

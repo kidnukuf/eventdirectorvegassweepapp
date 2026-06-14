@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateScantronId } from "./db";
+import { generateScantronId } from "./routers";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { COOKIE_NAME } from "../shared/const";

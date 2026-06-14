@@ -1,158 +1,126 @@
 import { useLocation } from "wouter";
-
-const roles = [
-  {
-    key: "admin",
-    label: "Event Director",
-    icon: "⚡",
-    desc: "Full admin access — roster, stats, audit log",
-    path: "/admin",
-    color: "#ffd700",
-  },
-  {
-    key: "program",
-    label: "Program Director",
-    icon: "📋",
-    desc: "League-scoped management and reporting",
-    path: "/admin?role=program",
-    color: "#ffd700",
-  },
-  {
-    key: "captain",
-    label: "Team Captain",
-    icon: "🎳",
-    desc: "Manage your team roster and registration links",
-    path: "/captain",
-    color: "#00ffff",
-  },
-  {
-    key: "doorman",
-    label: "Doorman Check-In",
-    icon: "🚪",
-    desc: "Look up bowlers and confirm event entry",
-    path: "/doorman",
-    color: "#00ffff",
-  },
-  {
-    key: "bowler",
-    label: "Bowler Registration",
-    icon: "📝",
-    desc: "Register for the event and get your scantron ID",
-    path: "/register",
-    color: "#00ff88",
-  },
-];
+import { trpc } from "@/lib/trpc";
 
 export default function Home() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
+  const { data: event } = trpc.event.active.useQuery();
+
+  const roles = [
+    {
+      icon: "🎯",
+      title: "Event Director",
+      desc: "Full admin access — manage all bowlers, centers, and events",
+      path: "/admin",
+      color: "from-yellow-500 to-orange-500",
+      glow: "shadow-yellow-500/40",
+    },
+    {
+      icon: "📋",
+      title: "Program Director",
+      desc: "League-scoped oversight and reporting",
+      path: "/admin?role=program",
+      color: "from-cyan-500 to-blue-500",
+      glow: "shadow-cyan-500/40",
+    },
+    {
+      icon: "🎳",
+      title: "Team Captain",
+      desc: "Manage your team roster and verify members",
+      path: "/captain",
+      color: "from-green-500 to-emerald-500",
+      glow: "shadow-green-500/40",
+    },
+    {
+      icon: "🚪",
+      title: "Doorman",
+      desc: "Check-in guests and manage wristbands at the door",
+      path: "/doorman",
+      color: "from-purple-500 to-pink-500",
+      glow: "shadow-purple-500/40",
+    },
+    {
+      icon: "👤",
+      title: "Bowler Sign-Up",
+      desc: "Register and claim your bowler profile",
+      path: "/register",
+      color: "from-red-500 to-rose-500",
+      glow: "shadow-red-500/40",
+    },
+  ];
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#1a1a1a" }}>
-      {/* Header */}
-      <header className="text-center py-10 px-4">
-        <div className="text-5xl mb-3">🎳</div>
-        <h1
-          style={{
-            fontFamily: "'Orbitron', sans-serif",
-            color: "#ffd700",
-            textShadow: "0 0 12px #ffd700, 0 0 30px #ffd70066",
-            fontSize: "clamp(1.6rem, 5vw, 2.8rem)",
-            fontWeight: 900,
-            letterSpacing: "0.05em",
-            margin: 0,
-          }}
-        >
-          VEGAS SWEEPS NAVIGATOR
-        </h1>
-        <p
-          style={{
-            color: "#00ffff",
-            textShadow: "0 0 8px #00ffff88",
-            marginTop: 8,
-            fontSize: "1rem",
-            letterSpacing: "0.15em",
-          }}
-        >
-          FUNTIME TEAM CHALLENGE 2026
-        </p>
-        <div
-          style={{
-            width: 120,
-            height: 2,
-            background: "linear-gradient(90deg, transparent, #00ffff, transparent)",
-            margin: "16px auto 0",
-          }}
-        />
-      </header>
+    <div className="min-h-screen bg-[#0d0d0d] text-white overflow-hidden relative">
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-3xl" />
+      </div>
 
-      {/* Role Cards */}
-      <main className="flex-1 container py-6">
-        <p
-          style={{ color: "#888", textAlign: "center", marginBottom: 32, fontSize: "0.95rem" }}
-        >
-          Select your role to continue
-        </p>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 20,
-            maxWidth: 900,
-            margin: "0 auto",
-          }}
-        >
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="text-6xl mb-4 animate-bounce">🎳</div>
+          <h1
+            className="text-5xl md:text-7xl font-black mb-3 tracking-tight"
+            style={{
+              fontFamily: "'Rajdhani', sans-serif",
+              background: "linear-gradient(135deg, #ffd700, #ff8c00, #00ffff)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              textShadow: "none",
+              filter: "drop-shadow(0 0 30px rgba(255,215,0,0.5))",
+            }}
+          >
+            VEGAS SWEEPS
+          </h1>
+          <h2
+            className="text-2xl md:text-3xl font-bold text-cyan-400 mb-2"
+            style={{ textShadow: "0 0 20px rgba(0,255,255,0.6)" }}
+          >
+            FUNTIME
+          </h2>
+          {event && (
+            <p className="text-gray-400 text-lg mt-2">
+              {(event as Record<string, unknown>).eventName as string} •{" "}
+              {(event as Record<string, unknown>).bowlingDate as string}
+            </p>
+          )}
+          <div className="mt-4 h-px w-64 mx-auto bg-gradient-to-r from-transparent via-yellow-500 to-transparent" />
+        </div>
+
+        {/* Role Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full max-w-4xl">
           {roles.map((role) => (
             <button
-              key={role.key}
-              onClick={() => navigate(role.path)}
-              className="strike-in"
-              style={{
-                background: "rgba(0,0,0,0.75)",
-                border: `1px solid ${role.color}44`,
-                borderRadius: 14,
-                padding: "28px 24px",
-                cursor: "pointer",
-                textAlign: "left",
-                transition: "all 0.18s cubic-bezier(0.23,1,0.32,1)",
-                boxShadow: `0 0 12px ${role.color}22`,
-                backdropFilter: "blur(8px)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = `${role.color}cc`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 24px ${role.color}55, 0 8px 32px rgba(0,0,0,0.5)`;
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-3px)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = `${role.color}44`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 12px ${role.color}22`;
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-              }}
+              key={role.path}
+              onClick={() => setLocation(role.path)}
+              className={`group relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm
+                hover:border-white/30 hover:bg-white/10 transition-all duration-200
+                hover:shadow-2xl ${role.glow} hover:scale-[1.02] active:scale-[0.98]
+                text-left cursor-pointer`}
             >
-              <div style={{ fontSize: 36, marginBottom: 10 }}>{role.icon}</div>
               <div
-                style={{
-                  color: role.color,
-                  fontFamily: "'Orbitron', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  textShadow: `0 0 8px ${role.color}88`,
-                  marginBottom: 6,
-                }}
-              >
-                {role.label}
-              </div>
-              <div style={{ color: "#aaa", fontSize: "0.85rem", lineHeight: 1.5 }}>
-                {role.desc}
-              </div>
+                className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-200 bg-gradient-to-br ${role.color}`}
+              />
+              <div className="text-4xl mb-3">{role.icon}</div>
+              <h3 className="text-xl font-bold text-white mb-1">{role.title}</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">{role.desc}</p>
+              <div
+                className={`mt-4 h-0.5 w-0 group-hover:w-full transition-all duration-300 bg-gradient-to-r ${role.color}`}
+              />
             </button>
           ))}
         </div>
-      </main>
 
-      {/* Footer */}
-      <footer style={{ textAlign: "center", padding: "24px 16px", color: "#444", fontSize: "0.8rem" }}>
-        Vegas Sweeps Navigator &copy; 2026 &nbsp;|&nbsp; 13 Bowling Centers &nbsp;|&nbsp; Multi-League Event Management
-      </footer>
+        {/* Footer */}
+        <div className="mt-12 text-center text-gray-600 text-sm">
+          <p>Vegas Sweeps Funtime Event Management System</p>
+          <p className="mt-1 text-xs">
+            Powered by local-first technology • Works offline
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
