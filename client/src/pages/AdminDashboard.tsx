@@ -5,6 +5,15 @@ import { toast } from "sonner";
 
 type Bowler = Record<string, unknown>;
 
+// Team completion color: gray = incomplete, yellow = all signed up, green = captain verified
+function getTeamColor(members: Bowler[]): { bg: string; border: string; label: string } {
+  const allVerified = members.every((m) => m.registrationStatus === "verified" || m.registrationStatus === "checked_in");
+  const allSignedUp = members.every((m) => m.registrationStatus === "signed_up" || m.registrationStatus === "verified" || m.registrationStatus === "checked_in");
+  if (allVerified) return { bg: "bg-green-500/10", border: "border-green-500/30", label: "text-green-400" };
+  if (allSignedUp) return { bg: "bg-yellow-500/10", border: "border-yellow-500/30", label: "text-yellow-400" };
+  return { bg: "bg-gray-800/50", border: "border-white/10", label: "text-gray-400" };
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pre_registered: "bg-gray-700 text-gray-300",
   signed_up: "bg-blue-900 text-blue-300",
@@ -24,13 +33,19 @@ const STATUS_LABELS: Record<string, string> = {
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest">("roster");
+  const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest" | "unmatched">("roster");
   const [editingBowler, setEditingBowler] = useState<Bowler | null>(null);
   const [editFields, setEditFields] = useState<Record<string, string>>({});
   const [showAllFields, setShowAllFields] = useState(false);
   const [newDoorman, setNewDoorman] = useState({ designation: "", password: "" });
   const [testQr, setTestQr] = useState<{ qrDataUrl: string; tokenValue: string } | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [collapsedCenters, setCollapsedCenters] = useState<Set<string>>(new Set());
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"hierarchy" | "flat">("hierarchy");
+
+  const toggleCenter = (name: string) => setCollapsedCenters((prev) => { const s = new Set(prev); s.has(name) ? s.delete(name) : s.add(name); return s; });
+  const toggleTeam = (key: string) => setCollapsedTeams((prev) => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
 
   const EVENT_ID = 1;
 
@@ -38,6 +53,7 @@ export default function AdminDashboard() {
   const { data: stats } = trpc.bowlers.stats.useQuery({ eventId: EVENT_ID });
   const { data: auditLog = [] } = trpc.audit.list.useQuery({ eventId: EVENT_ID, limit: 200 });
   const { data: doormen = [], refetch: refetchDoormen } = trpc.appAuth.listDoormen.useQuery({ eventId: EVENT_ID });
+  const unmatchedBowlers = useMemo(() => (bowlers as Bowler[]).filter((b) => b.registrationStatus === "unmatched"), [bowlers]);
 
   const updateBowler = trpc.bowlers.update.useMutation({
     onSuccess: () => { toast.success("Bowler updated"); refetch(); setEditingBowler(null); },
@@ -143,10 +159,10 @@ export default function AdminDashboard() {
 
       <div className="bg-[#111] border-b border-white/10 px-4">
         <div className="max-w-7xl mx-auto flex gap-1">
-          {(["roster", "doormen", "qrtest", "audit"] as const).map((tab) => (
+          {(["roster", "doormen", "qrtest", "audit", "unmatched"] as const).map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
-              {tab === "qrtest" ? "QR Test" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === "qrtest" ? "QR Test" : tab === "unmatched" ? `Unmatched${unmatchedBowlers.length > 0 ? ` (${unmatchedBowlers.length})` : ""}` : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -155,25 +171,76 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "roster" && (
           <div>
-            <div className="mb-4">
+            <div className="mb-4 flex gap-3 flex-wrap">
               <input type="text" placeholder="🔍 Search by name, ID, phone, center, team..." value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1a1a1a] border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500" />
+                className="flex-1 min-w-[200px] px-4 py-3 bg-[#1a1a1a] border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500" />
+              <div className="flex gap-1 bg-[#1a1a1a] border border-white/20 rounded-xl p-1">
+                <button onClick={() => setViewMode("hierarchy")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === "hierarchy" ? "bg-yellow-500 text-black" : "text-gray-400 hover:text-white"}`}>Hierarchy</button>
+                <button onClick={() => setViewMode("flat")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === "flat" ? "bg-yellow-500 text-black" : "text-gray-400 hover:text-white"}`}>Flat List</button>
+              </div>
             </div>
             {isLoading ? (
               <div className="text-center py-12 text-gray-500">Loading roster...</div>
+            ) : viewMode === "flat" ? (
+              <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="text-gray-500 text-xs border-b border-white/10">
+                      <th className="px-4 py-2 text-left">ID</th><th className="px-4 py-2 text-left">Name</th>
+                      <th className="px-4 py-2 text-left">Center</th><th className="px-4 py-2 text-left">Team</th>
+                      <th className="px-4 py-2 text-left">Phone</th><th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left">Actions</th>
+                    </tr></thead>
+                    <tbody>
+                      {(bowlers as Bowler[]).filter((b) => {
+                        if (!search) return true;
+                        const q = search.toLowerCase();
+                        return String(b.legalFirstName ?? "").toLowerCase().includes(q) || String(b.legalLastName ?? "").toLowerCase().includes(q) || String(b.scantronId ?? "").includes(q) || String(b.phone ?? "").includes(q) || String(b.centerName ?? "").toLowerCase().includes(q) || String(b.teamName ?? "").toLowerCase().includes(q);
+                      }).map((b) => (
+                        <tr key={String(b.id)} className="border-b border-white/5 hover:bg-white/5">
+                          <td className="px-4 py-2 font-mono text-yellow-400 text-xs">{String(b.scantronId ?? "—")}</td>
+                          <td className="px-4 py-2 font-semibold">{b.isCapitain ? "⭐ " : ""}{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</td>
+                          <td className="px-4 py-2 text-gray-400 text-xs">{String(b.centerName ?? "—")}</td>
+                          <td className="px-4 py-2 text-gray-400 text-xs">{String(b.teamName ?? "—")}</td>
+                          <td className="px-4 py-2 text-gray-400">{String(b.phone ?? "—")}</td>
+                          <td className="px-4 py-2"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[String(b.registrationStatus ?? "pre_registered")]}`}>{STATUS_LABELS[String(b.registrationStatus ?? "pre_registered")] ?? String(b.registrationStatus)}</span></td>
+                          <td className="px-4 py-2"><button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? "") }); }} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : (
               <div className="space-y-6">
-                {Array.from(grouped.entries()).map(([centerName, teamMap]) => (
+                {Array.from(grouped.entries()).map(([centerName, teamMap]) => {
+                  const isCollapsed = collapsedCenters.has(centerName);
+                  const centerBowlers = Array.from(teamMap.values()).flat();
+                  const checkedInCount = centerBowlers.filter((b) => b.registrationStatus === "checked_in").length;
+                  return (
                   <div key={centerName} className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
-                    <div className="px-5 py-3 bg-gradient-to-r from-yellow-500/20 to-transparent border-b border-yellow-500/30">
+                    <button onClick={() => toggleCenter(centerName)} className="w-full px-5 py-3 bg-gradient-to-r from-yellow-500/20 to-transparent border-b border-yellow-500/30 flex items-center justify-between hover:from-yellow-500/30 transition-colors">
                       <h2 className="text-lg font-bold text-yellow-400">🏠 {centerName}</h2>
-                    </div>
-                    {Array.from(teamMap.entries()).map(([teamLabel, members]) => (
-                      <div key={teamLabel} className="border-b border-white/5 last:border-0">
-                        <div className="px-5 py-2 bg-cyan-500/10 border-b border-cyan-500/20">
-                          <h3 className="text-sm font-semibold text-cyan-400">{teamLabel}</h3>
-                        </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">{centerBowlers.length} bowlers • {checkedInCount} checked in</span>
+                        <span className="text-gray-400 text-sm">{isCollapsed ? "▶" : "▼"}</span>
+                      </div>
+                    </button>
+                    {!isCollapsed && Array.from(teamMap.entries()).map(([teamLabel, members]) => {
+                      const teamKey = `${centerName}::${teamLabel}`;
+                      const isTeamCollapsed = collapsedTeams.has(teamKey);
+                      const tc = getTeamColor(members);
+                      const teamCheckedIn = members.filter((m) => m.registrationStatus === "checked_in").length;
+                      return (
+                      <div key={teamLabel} className={`border-b border-white/5 last:border-0 ${tc.bg}`}>
+                        <button onClick={() => toggleTeam(teamKey)} className={`w-full px-5 py-2 border-b ${tc.border} flex items-center justify-between hover:bg-white/5 transition-colors`}>
+                          <h3 className={`text-sm font-semibold ${tc.label}`}>{teamLabel}</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{members.length} bowlers • {teamCheckedIn} in</span>
+                            <span className="text-gray-500 text-xs">{isTeamCollapsed ? "▶" : "▼"}</span>
+                          </div>
+                        </button>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
@@ -212,9 +279,11 @@ export default function AdminDashboard() {
                           </table>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
-                ))}
+                );
+                })}
                 {grouped.size === 0 && (
                   <div className="text-center py-12 text-gray-500">{search ? "No bowlers match your search." : "No bowlers found. Import data to get started."}</div>
                 )}
@@ -286,6 +355,33 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === "unmatched" && (
+          <div>
+            <h2 className="text-xl font-bold text-red-400 mb-2">⚠️ Unmatched Sign-Ups</h2>
+            <p className="text-gray-400 text-sm mb-5">These bowlers signed up but could not be matched to a pre-registered record. Link them manually to an existing bowler record, or mark as new.</p>
+            {unmatchedBowlers.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">No unmatched sign-ups. All bowlers matched successfully.</div>
+            ) : (
+              <div className="space-y-3">
+                {unmatchedBowlers.map((b) => (
+                  <div key={String(b.id)} className="bg-[#1a1a1a] rounded-xl border border-red-500/30 p-4 flex flex-wrap items-center gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="font-bold text-white">{String(b.legalFirstName ?? "")} {String(b.legalLastName ?? "")}</div>
+                      <div className="text-gray-400 text-sm">{String(b.phone ?? "")} · {String(b.email ?? "No email")}</div>
+                      <div className="text-gray-500 text-xs mt-1">Signed up: {b.createdAt ? new Date(b.createdAt as string).toLocaleString() : "—"}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), registrationStatus: "signed_up" }); setShowAllFields(true); }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold transition-colors">Link / Edit</button>
+                      <span className="px-2 py-1 bg-red-900/50 text-red-300 rounded text-xs">Unmatched</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

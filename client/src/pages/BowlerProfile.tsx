@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useLocation, useParams } from "wouter";
+import { SponsorAdBanner } from "@/components/SponsorAdBanner";
 
 type Bowler = Record<string, unknown>;
 
@@ -68,6 +69,8 @@ export default function BowlerProfile() {
           </div>
         )}
 
+        <SponsorAdBanner slot="top" />
+
         <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-5">
           <h3 className="text-sm font-semibold text-gray-400 mb-3">Event Details</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -78,6 +81,12 @@ export default function BowlerProfile() {
             <div><span className="text-gray-500">Banquet:</span> <span className="text-white">{b.banquetAmount ? `$${b.banquetAmount}` : "—"}</span></div>
             <div><span className="text-gray-500">Captain:</span> <span className="text-white">{b.isCapitain ? "Yes ⭐" : "No"}</span></div>
           </div>
+        </div>
+
+        <SponsorAdBanner slot="bottom" />
+
+        <div className="text-center py-4 text-xs text-gray-700">
+          Vegas Sweeps Funtime 2026 · Powered by EventDirector
         </div>
       </div>
     </div>
