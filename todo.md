@@ -24,7 +24,7 @@
 - [x] Team Captain checkbox routing
 - [x] Doorman login page (/doorman-login, separate URL, ED-created accounts)
 - [x] Event Director login (admin credentials)
-- [ ] JWT sessions for all 5 roles with role-based route protection
+- [x] JWT sessions for all 5 roles with role-based route protection
 - [x] Unmatched sign-up queue (pending verification state)
 
 ## Phase 3 — Backend tRPC Routers (All Features)
