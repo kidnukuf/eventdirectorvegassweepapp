@@ -1,5 +1,7 @@
 import { z } from "zod";
+import jwt from "jsonwebtoken";
 import { COOKIE_NAME } from "@shared/const";
+import { bowlerAuthRouter } from "./routers/bowlerAuth";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -271,7 +273,8 @@ export const appRouter = router({
           action: "login",
           details: `${user.designation} logged in`,
         });
-        return { success: true, user: { id: user.id, username: user.username, designation: user.designation, appRole: user.appRole, bowlerId: user.bowlerId, teamId: user.teamId, leagueId: user.leagueId, eventId: user.eventId } };
+        const token = jwt.sign({ userId: user.id, appRole: user.appRole, designation: user.designation }, process.env.JWT_SECRET ?? "dev-secret", { expiresIn: "12h" });
+        return { success: true, token, user: { id: user.id, username: user.username, designation: user.designation, appRole: user.appRole, bowlerId: user.bowlerId, teamId: user.teamId, leagueId: user.leagueId, eventId: user.eventId } };
       }),
 
     createDoorman: publicProcedure
@@ -731,6 +734,9 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // ─── BOWLER / CAPTAIN AUTH ─────────────────────────────────────────────────
+  bowlerAuth: bowlerAuthRouter,
 });
 
 export type AppRouter = typeof appRouter;

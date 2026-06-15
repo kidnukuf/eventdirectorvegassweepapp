@@ -160,6 +160,18 @@ export default defineConfig({
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "@tanstack/react-query"],
+  },
+  optimizeDeps: {
+    // Force re-optimization on every start to prevent stale chunk caching
+    force: true,
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "@trpc/react-query",
+      "@tanstack/react-query",
+    ],
   },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),

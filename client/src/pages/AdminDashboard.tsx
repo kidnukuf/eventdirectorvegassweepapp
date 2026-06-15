@@ -3,6 +3,96 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
+// ─── Local storage key for ED session ────────────────────────────────────────
+const ED_TOKEN_KEY = "vsn_ed_token";
+function getEdToken() { return localStorage.getItem(ED_TOKEN_KEY); }
+function clearEdToken() { localStorage.removeItem(ED_TOKEN_KEY); }
+
+// ─── ED Login Gate ────────────────────────────────────────────────────────────
+function EdLoginGate({ onAuth }: { onAuth: () => void }) {
+  const [, setLocation] = useLocation();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const login = trpc.appAuth.login.useMutation({
+    onSuccess: (data) => {
+      localStorage.setItem(ED_TOKEN_KEY, data.token ?? "");
+      onAuth();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!username || !password) return toast.error("Enter username and password");
+    login.mutate({ username, password });
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center px-4">
+      {/* Background glows */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-yellow-500/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/3 w-64 h-64 bg-orange-500/8 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Back */}
+        <button onClick={() => setLocation("/")} className="text-gray-500 hover:text-white text-sm mb-8 flex items-center gap-1 transition-colors">
+          ← Back to Home
+        </button>
+
+        {/* Icon */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-3">🎯</div>
+          <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
+            EVENT DIRECTOR
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Staff access only</p>
+        </div>
+
+        {/* Login card */}
+        <form onSubmit={handleSubmit} className="bg-[#1a1a1a] border border-yellow-500/20 rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div>
+            <label className="block text-yellow-400/80 text-xs font-bold uppercase tracking-wider mb-1.5">Username</label>
+            <input
+              className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500/50 transition-colors"
+              placeholder="ED username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-yellow-400/80 text-xs font-bold uppercase tracking-wider mb-1.5">Password</label>
+            <input
+              type="password"
+              className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500/50 transition-colors"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={login.isPending}
+            className="w-full py-2.5 rounded-lg font-bold text-black transition-all duration-150 active:scale-[0.97]"
+            style={{ background: "linear-gradient(135deg, #ffd700, #ff8c00)", boxShadow: "0 4px 20px rgba(255,215,0,0.3)" }}
+          >
+            {login.isPending ? "Authenticating…" : "Access Dashboard →"}
+          </button>
+        </form>
+
+        <p className="text-center text-gray-700 text-xs mt-4">
+          Authorized personnel only. All actions are logged.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 type Bowler = Record<string, unknown>;
 
 // Team completion color: gray = incomplete, yellow = all signed up, green = captain verified
@@ -32,6 +122,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
+  const [isAuthed, setIsAuthed] = useState(() => !!getEdToken());
+
+  if (!isAuthed) {
+    return <EdLoginGate onAuth={() => setIsAuthed(true)} />;
+  }
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest" | "unmatched">("roster");
   const [editingBowler, setEditingBowler] = useState<Bowler | null>(null);
@@ -175,6 +270,7 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
+            <button onClick={() => { clearEdToken(); setIsAuthed(false); }} className="text-red-400/60 hover:text-red-400 text-xs ml-2 transition-colors">Sign Out</button>
             <span className="text-gray-600">|</span>
             <h1 className="text-2xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
               🎯 EVENT DIRECTOR

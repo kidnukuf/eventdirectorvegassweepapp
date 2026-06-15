@@ -13,11 +13,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="VegasSweeps" />
     <script>
-      // Register service worker for offline PWA support
+      // Register service worker only in production (not dev/preview)
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        const isProd = location.hostname !== 'localhost' &&
+                       location.hostname !== '127.0.0.1' &&
+                       !location.hostname.includes('.manus.computer') &&
+                       !location.hostname.includes('.manuspre.computer');
+        if (isProd) {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
+        } else {
+          // Unregister any stale SW in dev to prevent caching issues
+          navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+        }
       }
     </script>
   </head>

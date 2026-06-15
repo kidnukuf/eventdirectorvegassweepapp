@@ -13,6 +13,9 @@ import DoormanCheckIn from "./pages/DoormanCheckIn";
 import BowlerProfile from "./pages/BowlerProfile";
 import ImportData from "./pages/ImportData";
 import ProgramDirector from "./pages/ProgramDirector";
+import BowlerLogin from "./pages/BowlerLogin";
+import BowlerDashboard from "./pages/BowlerDashboard";
+import CaptainDashboard from "./pages/CaptainDashboard";
 
 function Router() {
   return (
@@ -25,6 +28,9 @@ function Router() {
       <Route path="/bowler/:id" component={BowlerProfile} />
       <Route path="/import" component={ImportData} />
       <Route path="/program-director" component={ProgramDirector} />
+      <Route path="/bowler-login" component={BowlerLogin} />
+      <Route path="/bowler-dashboard" component={BowlerDashboard} />
+      <Route path="/captain-dashboard" component={CaptainDashboard} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

@@ -1,16 +1,9 @@
-// Vegas Sweeps Funtime — Service Worker v3.0
-// Offline-first PWA: caches all routes and static assets
-// IndexedDB caching for bowler data, graceful offline fallback
-
-const CACHE_NAME = "vegas-sweeps-v3";
+// Vegas Sweeps Funtime — Service Worker v4.0
+// v4: skip all Vite dev assets (/@fs/, /@vite/, /src/, /node_modules/)
+//     to prevent stale chunk caching in development
+const CACHE_NAME = "vegas-sweeps-v4";
 const STATIC_ASSETS = [
   "/",
-  "/admin",
-  "/register",
-  "/captain",
-  "/doorman",
-  "/program-director",
-  "/import",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
@@ -59,36 +52,52 @@ async function idbGet(key) {
   } catch { return null; }
 }
 
-// Install: pre-cache all static routes
+// Install: pre-cache only minimal static assets (not app routes)
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Non-fatal: some routes may not be available at install time
-        return Promise.all(
-          STATIC_ASSETS.map((url) =>
-            cache.add(url).catch(() => { /* skip unavailable */ })
-          )
-        );
-      });
+      return Promise.all(
+        STATIC_ASSETS.map((url) =>
+          cache.add(url).catch(() => { /* skip unavailable */ })
+        )
+      );
     })
   );
+  // Take control immediately
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// Activate: clean up ALL old caches and take control
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: network-first for API calls, cache-first for static assets
+// Fetch: never intercept Vite dev server assets
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  // NEVER cache Vite dev server assets — these change on every build
+  if (
+    url.pathname.startsWith("/@fs/") ||
+    url.pathname.startsWith("/@vite/") ||
+    url.pathname.startsWith("/@id/") ||
+    url.pathname.startsWith("/src/") ||
+    url.pathname.startsWith("/node_modules/") ||
+    url.pathname.startsWith("/__manus__/") ||
+    url.search.includes("?v=") ||
+    url.search.includes("&v=") ||
+    url.hostname.includes(".manus.computer") ||
+    url.hostname.includes(".manuspre.computer") ||
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1"
+  ) {
+    // Pass through to network without caching
+    return;
+  }
 
   // SSE stream: never cache, never intercept
   if (url.pathname === "/api/events/stream") {
@@ -115,7 +124,6 @@ self.addEventListener("fetch", (event) => {
             return response;
           })
           .catch(async () => {
-            // Offline: serve from IndexedDB
             const cached = await idbGet(url.pathname + url.search);
             if (cached) {
               return new Response(cached, {
@@ -157,7 +165,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: cache-first with network fallback
+  // Static assets (production only): cache-first with network fallback
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -170,7 +178,6 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          // For navigation requests, return the cached root
           if (event.request.mode === "navigate") {
             return caches.match("/").then((r) => r || new Response("Offline — Vegas Sweeps Funtime", { status: 503 }));
           }
@@ -180,12 +187,11 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Message handler: force update or cache bowler data
+// Message handler
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") {
     self.skipWaiting();
   }
-  // Cache bowler data for offline use
   if (event.data?.type === "CACHE_BOWLERS" && event.data.data) {
     idbPut("bowlers-manual", JSON.stringify(event.data.data));
   }
