@@ -273,9 +273,7 @@ export default function BowlerLogin() {
           </Tabs>
         </div>
 
-        <p className="text-white/30 text-xs mt-6 text-center">
-          Team Captain? Your account gives you access to team management tools.
-        </p>
+
       </div>
     </div>
   );

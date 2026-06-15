@@ -10,33 +10,6 @@ export default function Home() {
   const bowlerToken = getBowlerToken();
   const isCapitain = localStorage.getItem(BOWLER_IS_CAPTAIN_KEY) === "1";
 
-  const staffRoles = [
-    {
-      icon: "🎯",
-      title: "Event Director",
-      desc: "Full admin access — manage all bowlers, centers, and events",
-      path: "/admin",
-      color: "from-yellow-500 to-orange-500",
-      glow: "shadow-yellow-500/40",
-    },
-    {
-      icon: "📋",
-      title: "Program Director",
-      desc: "League-scoped oversight and reporting",
-      path: "/program-director",
-      color: "from-cyan-500 to-blue-500",
-      glow: "shadow-cyan-500/40",
-    },
-    {
-      icon: "🚪",
-      title: "Doorman",
-      desc: "Check-in guests and scan QR tickets at the door",
-      path: "/doorman",
-      color: "from-purple-500 to-pink-500",
-      glow: "shadow-purple-500/40",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white overflow-hidden relative">
       {/* Animated background glows */}
@@ -165,42 +138,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            STAFF / ADMIN SECTION — neon dark design
-            ══════════════════════════════════════════════════════ */}
-        <div className="w-full max-w-4xl">
-          <div className="text-center mb-6">
-            <div className="flex items-center gap-3 justify-center mb-1">
-              <div className="h-px flex-1 bg-white/10" />
-              <h2 className="text-sm font-bold text-white/40 uppercase tracking-widest">Staff Access</h2>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-            <p className="text-white/30 text-xs">Protected — authorized personnel only</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {staffRoles.map((role) => (
-              <button
-                key={role.path}
-                onClick={() => setLocation(role.path)}
-                className={`group relative p-5 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm
-                  hover:border-white/30 hover:bg-white/10 transition-all duration-200
-                  hover:shadow-2xl ${role.glow} hover:scale-[1.02] active:scale-[0.98]
-                  text-left cursor-pointer`}
-              >
-                <div
-                  className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-200 bg-gradient-to-br ${role.color}`}
-                />
-                <div className="text-3xl mb-3">{role.icon}</div>
-                <h3 className="text-base font-bold text-white mb-1">{role.title}</h3>
-                <p className="text-gray-500 text-xs leading-relaxed">{role.desc}</p>
-                <div
-                  className={`mt-3 h-0.5 w-0 group-hover:w-full transition-all duration-300 bg-gradient-to-r ${role.color}`}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Footer */}
         <div className="mt-12 text-center text-gray-600 text-sm">
