@@ -182,6 +182,13 @@ export default defineConfig({
   },
   server: {
     host: true,
+    hmr: {
+      // When accessed via the Manus proxy (external devices/phones), use the
+      // proxy's own host and port so the HMR WebSocket doesn't try to connect
+      // to localhost:5173 and show a failing-WebSocket warning.
+      clientPort: 443,
+      protocol: "wss",
+    },
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",
