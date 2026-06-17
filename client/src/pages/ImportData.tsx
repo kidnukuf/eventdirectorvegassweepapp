@@ -58,8 +58,9 @@ const COLUMN_ALIASES: Record<string, string> = {
   "1st choice squad": "choiceSquad1", "2nd choice squad": "choiceSquad2",
   "league member": "leagueMember", "returning bowler?": "returningBowler",
   "t-shirt size": "shirtSize", "room with bowler?": "roomWithBowler",
-  "banquet $80": "banquetAmount", "guest $15": "guestAmount", "special notes": "specialNotes",
-  "extra banquet": "extraBanquet", "extra pool party": "extraPoolParty",
+  "banquet $80": "banquetAmount", "guest $15": "poolParty", "special notes": "specialNotes",
+  "extra banquet": "extraBanquet", "extra pool party": "poolParty",
+  "guest pool party": "poolParty",
 };
 
 function parseCSV(text: string): string[][] {

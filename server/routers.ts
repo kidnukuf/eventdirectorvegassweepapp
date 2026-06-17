@@ -695,23 +695,29 @@ export const appRouter = router({
               [scantronId]
             ) as Record<string, unknown>[];
 
-            // Parse hotel/payment data
+            // Parse hotel/payment data — 22-column B.O.B. layout (Jun 17 v2)
             const checkinDate = String(row["Check In"] ?? row["checkin_date"] ?? "").trim();
             const checkoutDate = String(row["Check Out"] ?? row["checkout_date"] ?? "").trim();
+            // Room Type removed from sheet — keep fallback for legacy imports
             const roomType = String(row["Room Type"] ?? row["room_type"] ?? "").trim();
-            const roommateRequested = String(row["Room With Bowler?"] ?? row["Roommate Y/N"] ?? row["roommate"] ?? "").trim().toUpperCase() === "Y";
             const roommateFirst = String(row["Roommate First Name"] ?? row["roommate_first"] ?? "").trim();
             const roommateLast = String(row["Roommate Last Name"] ?? row["roommate_last"] ?? "").trim();
+            // roommateRequested: infer from roommate name being present
+            const roommateRequested = !!(roommateFirst || roommateLast);
             const roomAmount = parseFloat(String(row["Amount Due"] ?? row["Room Amount Due"] ?? row["room_amount"] ?? "0").replace(/[$,]/g, "")) || 0;
-            const banquetAmount = parseFloat(String(row["Banquet $80"] ?? row["banquet"] ?? "0").replace(/[$,]/g, "")) || 0;
-            const poolParty = parseFloat(String(row["Guest $15"] ?? "0").replace(/[$,]/g, "")) > 0;
-            const extraGuestFee = parseFloat(String(row["Guest $15"] ?? row["Pool Party Guest $15"] ?? row["extra_guest"] ?? "0").replace(/[$,]/g, "")) || 0;
+            // Banquet: "extra banquet" column
+            const extraBanquet = parseFloat(String(row["extra banquet"] ?? row["Extra Banquet"] ?? row["Banquet $80"] ?? row["banquet"] ?? "0").replace(/[$,]/g, "")) || 0;
+            // Pool party: "Guest Pool Party" column (renamed from "Guest $15" / "extra pool party")
+            const guestPoolPartyRaw = String(row["Guest Pool Party"] ?? row["Guest $15"] ?? row["extra pool party"] ?? row["Extra Pool Party"] ?? "0").replace(/[$,]/g, "").trim();
+            const poolParty = parseFloat(guestPoolPartyRaw) > 0 || ["y", "yes", "true", "1", "x"].includes(guestPoolPartyRaw.toLowerCase());
+            const extraGuestFee = parseFloat(guestPoolPartyRaw) || 0;
             const totalAmountDue = parseFloat(String(row["Total Amount"] ?? row["total"] ?? "0").replace(/[$,]/g, "")) || 0;
             const notes = String(row["Special Notes"] ?? row["notes"] ?? "").trim();
+            // Phone and Email are present but typically empty — accept gracefully
             const phone = String(row["Phone"] ?? row["phone"] ?? "").trim();
             const email = String(row["Email"] ?? row["email"] ?? "").trim();
 
-            // New 24-column sheet fields
+            // Bowling stats fields
             const sanctionNumber = String(row["Sanction #"] ?? row["sanction_number"] ?? row["Sanction"] ?? "").trim() || undefined;
             const gamesRaw = String(row["# Games"] ?? row["Games"] ?? row["games"] ?? "").trim();
             const gamesPlayed = gamesRaw ? (parseInt(gamesRaw) || undefined) : undefined;
@@ -725,10 +731,6 @@ export const appRouter = router({
             const squadTimeVal = String(row["Squad Time"] ?? row["squad_time"] ?? "").trim() || undefined;
             const laneRaw = String(row["Lane #"] ?? row["Lane"] ?? row["lane"] ?? "").trim();
             const laneNumber = laneRaw ? (parseInt(laneRaw) || undefined) : undefined;
-
-            // Add-on payments from new columns
-            const extraBanquet = parseFloat(String(row["extra banquet"] ?? row["Extra Banquet"] ?? "0").replace(/[$,]/g, "")) || 0;
-            const extraPoolParty = parseFloat(String(row["extra pool party"] ?? row["Extra Pool Party"] ?? "0").replace(/[$,]/g, "")) || 0;
 
             if (existing.length > 0) {
               // Update existing
@@ -744,9 +746,9 @@ export const appRouter = router({
               if (checkinDate || checkoutDate || roomType) {
                 await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
               }
-              const effectiveBanquet = banquetAmount || extraBanquet;
-              const effectivePoolParty = poolParty || extraPoolParty > 0;
-              const effectiveExtraGuest = extraGuestFee || extraPoolParty;
+              const effectiveBanquet = extraBanquet;
+              const effectivePoolParty = poolParty;
+              const effectiveExtraGuest = extraGuestFee;
               if (effectiveBanquet || totalAmountDue || effectivePoolParty || effectiveExtraGuest) {
                 await upsertPaymentRecord(bowlerId, { roomAmount, banquetAmount: effectiveBanquet, poolParty: effectivePoolParty, extraGuestFee: effectiveExtraGuest, totalAmountDue });
               }
@@ -768,9 +770,9 @@ export const appRouter = router({
                 if (checkinDate || checkoutDate || roomType) {
                   await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
                 }
-                const effectiveBanquet2 = banquetAmount || extraBanquet;
-                const effectivePoolParty2 = poolParty || extraPoolParty > 0;
-                const effectiveExtraGuest2 = extraGuestFee || extraPoolParty;
+                const effectiveBanquet2 = extraBanquet;
+                const effectivePoolParty2 = poolParty;
+                const effectiveExtraGuest2 = extraGuestFee;
                 if (effectiveBanquet2 || totalAmountDue || effectivePoolParty2 || effectiveExtraGuest2) {
                   await upsertPaymentRecord(bowlerId, { roomAmount, banquetAmount: effectiveBanquet2, poolParty: effectivePoolParty2, extraGuestFee: effectiveExtraGuest2, totalAmountDue });
                 }
