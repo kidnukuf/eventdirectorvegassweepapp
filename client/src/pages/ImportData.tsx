@@ -25,6 +25,7 @@ interface ParsedRow {
   totalDue: string;
   paid: boolean;
   errors: string[];
+  raw: Record<string, string>;
 }
 
 // Column name aliases — maps common header variants to canonical field names
@@ -46,8 +47,18 @@ const COLUMN_ALIASES: Record<string, string> = {
   "room amount": "roomAmount", "room cost": "roomAmount", "hotel amount": "roomAmount",
   "banquet": "banquetAmount", "banquet amount": "banquetAmount", "banquet cost": "banquetAmount",
   "pool party": "poolParty", "pool": "poolParty",
-  "total": "totalDue", "total due": "totalDue", "amount due": "totalDue",
-  "paid": "paid", "payment status": "paid",
+  "total": "totalDue", "total due": "totalDue", "amount due": "totalDue", "total amount": "totalDue",
+  "paid": "paid", "payment status": "paid", "paid y/n": "paid",
+  // Display-only aliases (server stores these via raw headers / notes)
+  "squad time": "squadTime", "lane #": "laneNumber", "lane": "laneNumber",
+  "gender": "gender", "under 21?": "under21", "under 21": "under21",
+  "sanction #": "sanctionNumber", "sanction": "sanctionNumber",
+  "# games": "numGames", "high avg": "highAvg", "best avg": "bestAvg",
+  "book 25-26": "book2526", "book 24-25": "book2425", "book 23-24": "book2324",
+  "1st choice squad": "choiceSquad1", "2nd choice squad": "choiceSquad2",
+  "league member": "leagueMember", "returning bowler?": "returningBowler",
+  "t-shirt size": "shirtSize", "room with bowler?": "roomWithBowler",
+  "banquet $80": "banquetAmount", "guest $15": "guestAmount", "special notes": "specialNotes",
 };
 
 function parseCSV(text: string): string[][] {
@@ -79,12 +90,15 @@ function mapHeaders(headers: string[]): Record<number, string> {
   return map;
 }
 
-function parseRows(rawRows: string[][], headerMap: Record<number, string>): ParsedRow[] {
+function parseRows(rawRows: string[][], headerMap: Record<number, string>, headers: string[]): ParsedRow[] {
   return rawRows.map((row, idx) => {
     const get = (field: string) => {
       const colIdx = Object.entries(headerMap).find(([, v]) => v === field)?.[0];
       return colIdx !== undefined ? (row[Number(colIdx)] ?? "").trim() : "";
     };
+    // Build raw record keyed by ORIGINAL header names so the server's header-based lookups work
+    const raw: Record<string, string> = {};
+    headers.forEach((h, i) => { raw[h] = (row[i] ?? "").trim(); });
     const errors: string[] = [];
     const firstName = get("firstName");
     const lastName = get("lastName");
@@ -113,6 +127,7 @@ function parseRows(rawRows: string[][], headerMap: Record<number, string>): Pars
       totalDue: get("totalDue"),
       paid: ["yes", "true", "1", "y", "paid"].includes(get("paid").toLowerCase()),
       errors,
+      raw,
     };
   });
 }
@@ -124,7 +139,7 @@ export default function ImportData() {
   const [rawHeaders, setRawHeaders] = useState<string[]>([]);
   const [headerMap, setHeaderMap] = useState<Record<number, string>>({});
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
-  const [importResult, setImportResult] = useState<{ imported: number; errors: number; ids: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; errors: number; generatedIds: string[] } | null>(null);
   const [googleUrl, setGoogleUrl] = useState("");
   const [pastedText, setPastedText] = useState("");
   const [activeTab, setActiveTab] = useState<"file" | "google" | "paste">("file");
@@ -132,10 +147,11 @@ export default function ImportData() {
 
   const importMutation = trpc.import.process.useMutation({
     onSuccess: (data: unknown) => {
-      const d = data as { imported: number; errors: number; ids: string[] };
-      setImportResult(d);
+      const d = data as { imported: number; updated: number; errors: number; generatedIds: string[] };
+      setImportResult({ imported: d.imported ?? 0, updated: d.updated ?? 0, errors: d.errors ?? 0, generatedIds: d.generatedIds ?? [] });
       setStep("done");
-      toast.success(`✅ Imported ${d.imported} bowlers successfully!`);
+      const total = (d.imported ?? 0) + (d.updated ?? 0);
+      toast.success(`\u2705 Imported ${d.imported ?? 0} new, updated ${d.updated ?? 0} (${total} total)!`);
     },
     onError: (e: { message: string }) => toast.error(`Import failed: ${e.message}`),
   });
@@ -148,7 +164,7 @@ export default function ImportData() {
     const hMap = mapHeaders(headers);
     setRawHeaders(headers);
     setHeaderMap(hMap);
-    setParsedRows(parseRows(dataRows, hMap));
+    setParsedRows(parseRows(dataRows, hMap, headers));
     setStep("preview");
   }, []);
 
@@ -186,7 +202,9 @@ export default function ImportData() {
   const handleImport = () => {
     const validRows = parsedRows.filter(r => r.errors.length === 0);
     if (validRows.length === 0) { toast.error("No valid rows to import."); return; }
-    importMutation.mutate({ rows: validRows as unknown as Record<string, unknown>[], eventId: 1, sourceType: activeTab === "google" ? "google_sheets" : activeTab === "paste" ? "paste" : "csv", sourceName: activeTab === "file" ? "uploaded file" : activeTab === "google" ? googleUrl : "pasted data" });
+    // Send the RAW row data keyed by original headers so the server's header-based lookups work
+    const rawRows = validRows.map(r => r.raw);
+    importMutation.mutate({ rows: rawRows as unknown as Record<string, unknown>[], eventId: 1, sourceType: activeTab === "google" ? "google_sheets" : activeTab === "paste" ? "paste" : "csv", sourceName: activeTab === "file" ? "uploaded file" : activeTab === "google" ? googleUrl : "pasted data" });
   };
 
   const errorCount = parsedRows.filter(r => r.errors.length > 0).length;
@@ -396,14 +414,14 @@ export default function ImportData() {
                   <div className="text-gray-400 text-sm">Rows Skipped</div>
                 </div>
               </div>
-              {importResult.ids.length > 0 && (
+              {importResult.generatedIds.length > 0 && (
                 <div className="bg-[#111] rounded-xl p-4 text-left mb-6">
                   <p className="text-gray-400 text-xs mb-2 font-semibold">SAMPLE GENERATED IDs:</p>
                   <div className="flex flex-wrap gap-2">
-                    {importResult.ids.slice(0, 10).map(id => (
+                    {importResult.generatedIds.slice(0, 10).map(id => (
                       <span key={id} className="font-mono text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-500/30 rounded px-2 py-1">{id}</span>
                     ))}
-                    {importResult.ids.length > 10 && <span className="text-gray-500 text-xs">+{importResult.ids.length - 10} more</span>}
+                    {importResult.generatedIds.length > 10 && <span className="text-gray-500 text-xs">+{importResult.generatedIds.length - 10} more</span>}
                   </div>
                 </div>
               )}

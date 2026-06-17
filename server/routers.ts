@@ -558,26 +558,25 @@ export const appRouter = router({
 
         for (const row of input.rows) {
           try {
-            const centerName = String(row["Center"] ?? row["center"] ?? "").trim();
+            let centerName = String(row["Center"] ?? row["center"] ?? "").trim();
+            // Normalize known spreadsheet center-name variants to seeded DB names
+            const CENTER_NAME_ALIASES: Record<string, string> = {
+              "bowlero river grove sat": "Bowlero River Grove (Saturday)",
+              "bowlero river grove saturday": "Bowlero River Grove (Saturday)",
+            };
+            const aliased = CENTER_NAME_ALIASES[centerName.toLowerCase()];
+            if (aliased) centerName = aliased;
             const teamCode = String(row["Team #"] ?? row["team"] ?? row["Team"] ?? "").trim().padStart(2, "0");
             const firstName = String(row["First Name"] ?? row["first_name"] ?? row["FirstName"] ?? "").trim();
             const lastName = String(row["Last Name"] ?? row["last_name"] ?? row["LastName"] ?? "").trim();
             const teamName = String(row["Team Name"] ?? row["team_name"] ?? "").trim();
-            const isCapt = !!(row["Capt"] ?? row["Captain"] ?? row["capt"]);
+            const captRaw = String(row["Capt"] ?? row["Captain"] ?? row["capt"] ?? row["captain"] ?? "").trim().toLowerCase();
+            const isCapt = ["y", "yes", "true", "1", "x"].includes(captRaw);
 
             if (!firstName || !lastName) { skipped++; continue; }
 
-            // Find center
-            let center = centerMap.get(centerName.toLowerCase()) as Record<string, unknown> | undefined;
-            if (!center) {
-              // Try partial match
-              for (const [key, val] of Array.from(centerMap.entries())) {
-                if (key.includes(centerName.toLowerCase()) || centerName.toLowerCase().includes(key)) {
-                  center = val as Record<string, unknown>;
-                  break;
-                }
-              }
-            }
+            // Find center — exact match only (substring matching caused River Grove collisions)
+            const center = centerMap.get(centerName.toLowerCase()) as Record<string, unknown> | undefined;
             if (!center) {
               errors++;
               errorDetails.push({ row: firstName + " " + lastName, error: `Center not found: ${centerName}` });
@@ -628,13 +627,13 @@ export const appRouter = router({
             const checkinDate = String(row["Check In"] ?? row["checkin_date"] ?? "").trim();
             const checkoutDate = String(row["Check Out"] ?? row["checkout_date"] ?? "").trim();
             const roomType = String(row["Room Type"] ?? row["room_type"] ?? "").trim();
-            const roommateRequested = String(row["Roommate Y/N"] ?? row["roommate"] ?? "").trim().toUpperCase() === "Y";
+            const roommateRequested = String(row["Room With Bowler?"] ?? row["Roommate Y/N"] ?? row["roommate"] ?? "").trim().toUpperCase() === "Y";
             const roommateFirst = String(row["Roommate First Name"] ?? row["roommate_first"] ?? "").trim();
             const roommateLast = String(row["Roommate Last Name"] ?? row["roommate_last"] ?? "").trim();
-            const roomAmount = parseFloat(String(row["Room Amount Due"] ?? row["room_amount"] ?? "0").replace(/[$,]/g, "")) || 0;
+            const roomAmount = parseFloat(String(row["Amount Due"] ?? row["Room Amount Due"] ?? row["room_amount"] ?? "0").replace(/[$,]/g, "")) || 0;
             const banquetAmount = parseFloat(String(row["Banquet $80"] ?? row["banquet"] ?? "0").replace(/[$,]/g, "")) || 0;
-            const poolParty = String(row["Pool Party Y or N"] ?? row["pool_party"] ?? "N").trim().toUpperCase() === "Y";
-            const extraGuestFee = parseFloat(String(row["Pool Party Guest $15"] ?? row["extra_guest"] ?? "0").replace(/[$,]/g, "")) || 0;
+            const poolParty = parseFloat(String(row["Guest $15"] ?? "0").replace(/[$,]/g, "")) > 0;
+            const extraGuestFee = parseFloat(String(row["Guest $15"] ?? row["Pool Party Guest $15"] ?? row["extra_guest"] ?? "0").replace(/[$,]/g, "")) || 0;
             const totalAmountDue = parseFloat(String(row["Total Amount"] ?? row["total"] ?? "0").replace(/[$,]/g, "")) || 0;
             const notes = String(row["Special Notes"] ?? row["notes"] ?? "").trim();
             const phone = String(row["Phone"] ?? row["phone"] ?? "").trim();
@@ -646,7 +645,7 @@ export const appRouter = router({
               await updateBowler(bowlerId, {
                 legalFirstName: firstName, legalLastName: lastName,
                 teamId, centerId: center.id as number, isCapitain: isCapt,
-                teamName, notes: notes || undefined,
+                notes: notes || undefined,
                 phone: phone || undefined, email: email || undefined,
               });
               if (checkinDate || checkoutDate || roomType) {
