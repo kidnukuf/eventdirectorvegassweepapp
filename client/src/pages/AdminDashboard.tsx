@@ -120,13 +120,8 @@ const STATUS_LABELS: Record<string, string> = {
   unmatched: "Unmatched",
 };
 
-export default function AdminDashboard() {
+function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
   const [, setLocation] = useLocation();
-  const [isAuthed, setIsAuthed] = useState(() => !!getEdToken());
-
-  if (!isAuthed) {
-    return <EdLoginGate onAuth={() => setIsAuthed(true)} />;
-  }
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest" | "unmatched">("roster");
   const [editingBowler, setEditingBowler] = useState<Bowler | null>(null);
@@ -286,7 +281,7 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <button onClick={() => setLocation("/")} className="text-gray-400 hover:text-white text-sm">← Home</button>
-            <button onClick={() => { clearEdToken(); setIsAuthed(false); }} className="text-red-400/60 hover:text-red-400 text-xs ml-2 transition-colors">Sign Out</button>
+            <button onClick={onSignOut} className="text-red-400/60 hover:text-red-400 text-xs ml-2 transition-colors">Sign Out</button>
             <span className="text-gray-600">|</span>
             <h1 className="text-2xl font-black" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
               🎯 EVENT DIRECTOR
@@ -710,4 +705,10 @@ export default function AdminDashboard() {
       )}
     </div>
   );
+}
+
+export default function AdminDashboard() {
+  const [isAuthed, setIsAuthed] = useState(() => !!getEdToken());
+  if (!isAuthed) return <EdLoginGate onAuth={() => setIsAuthed(true)} />;
+  return <AdminDashboardInner onSignOut={() => { clearEdToken(); setIsAuthed(false); }} />;
 }
