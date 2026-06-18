@@ -146,41 +146,41 @@
 ## Phase 14: QR Passport System + Post-Sign-Up Confirmation Flow (Jun 18)
 
 ### Database
-- [ ] Add poolPartyToken (varchar, nullable), poolPartyUsed (boolean), banquetToken (varchar, nullable), banquetUsed (boolean) to bowlers table
-- [ ] Run migration SQL via webdev_execute_sql
+- [x] Add poolPartyToken (varchar, nullable), poolPartyUsed (boolean), banquetToken (varchar, nullable), banquetUsed (boolean) to bowlers table
+- [x] Run migration SQL via webdev_execute_sql
 
 ### Server
-- [ ] Generate two unique UUID tokens at bowler sign-up (pool + banquet), store in DB
-- [ ] tRPC: bowlerAuth.submitContactInfo — save phone + email, return full profile with tokens
-- [ ] tRPC: bowlerAuth.scanPassport — validate token (type: pool|banquet), check not null, check not used, mark used, return result + bowler name
-- [ ] tRPC: bowlerAuth.disablePassport / enablePassport — Event Director only
-- [ ] tRPC: bowlerAuth.getPassportStatus — list all bowlers with token/used status for Event Director
-- [ ] Google Sheet write-back: HYPERLINK formula for pool and banquet QR URLs written after sign-up
+- [x] Generate two unique UUID tokens at bowler sign-up (pool + banquet), store in DB
+- [x] tRPC: bowlerAuth.submitContactInfo — save phone + email, return full profile with tokens
+- [x] tRPC: bowlerAuth.scanPassport — validate token (type: pool|banquet), check not null, check not used, mark used, return result + bowler name
+- [x] tRPC: bowlerAuth.disablePassport / enablePassport — Event Director only
+- [x] tRPC: bowlerAuth.getPassportStatus — list all bowlers with token/used status for Event Director
+- [ ] Google Sheet write-back: HYPERLINK formula for pool and banquet QR URLs written after sign-up (deferred — requires Google Service Account setup)
 
 ### Bowler Post-Sign-Up Confirmation Page (/bowler-confirmation)
-- [ ] Step 1: 10-digit zero-padded bowler ID prominently displayed, phone + email entry fields, submit
-- [ ] Step 2: Full-screen color burst animated splash with "Bowlers Orleans Bound" overlay text
-- [ ] Step 3: Event week dates, squad number, starting lane
-- [ ] Pool Party Passport box — QR code if token active, "See your Team Captain" if disabled/null
-- [ ] Banquet Dinner Passport box — same logic
-- [ ] Early arrival prompt: "We recommend arriving 30 minutes early — lines form quickly!"
+- [x] Step 1: 10-digit zero-padded bowler ID prominently displayed, phone + email entry fields, submit
+- [x] Step 2: Full-screen color burst animated splash with "Bowlers Orleans Bound" overlay text
+- [x] Step 3: Event week dates, squad number, starting lane
+- [x] Pool Party Passport box — QR code if token active, "See your Team Captain" if disabled/null
+- [x] Banquet Dinner Passport box — same logic
+- [x] Early arrival prompt: "We recommend arriving 30 minutes early — lines form quickly!"
 
 ### Captain Post-Sign-Up Confirmation Page (/captain-confirmation)
-- [ ] Same as bowler confirmation (ID, phone/email, color burst, event details, passport QR boxes)
-- [ ] After contact info: team verification page showing all teammates with sign-up status
-- [ ] Captain responsibility popup: "You are the primary contact for your team. All event interactions go through you to the Event Director."
-- [ ] Early arrival prompt same as bowler
+- [x] Same as bowler confirmation (ID, phone/email, color burst, event details, passport QR boxes)
+- [x] After contact info: team verification page showing all teammates with sign-up status
+- [x] Captain responsibility popup: "You are the primary contact for your team. All event interactions go through you to the Event Director."
+- [x] Early arrival prompt same as bowler
 
 ### Doorman Portal (rebuild /doorman)
-- [ ] Camera QR scanner using html5-qrcode
-- [ ] Mode selector: Pool Party | Banquet Dinner
-- [ ] On valid scan: green "Entry Granted" screen with bowler name
-- [ ] On already used: red "Already Redeemed" screen
-- [ ] On disabled/null: red "Not Eligible — See Event Director" screen
-- [ ] On invalid token: red "Invalid QR Code" screen
+- [x] Camera QR scanner using html5-qrcode
+- [x] Mode selector: Pool Party | Banquet Dinner
+- [x] On valid scan: green "Entry Granted" screen with bowler name
+- [x] On already used: red "Already Redeemed" screen
+- [x] On disabled/null: red "Not Eligible — See Event Director" screen
+- [x] On invalid token: red "Invalid QR Code" screen
 
 ### Event Director — Passport Management Tab
-- [ ] New tab in Event Director dashboard: Passport Management
-- [ ] Table: all bowlers, pool party token status (active/disabled/redeemed), banquet token status
-- [ ] Disable / Re-enable buttons per bowler per passport type
-- [ ] Redemption count summary (e.g., 142/450 pool party redeemed)
+- [x] New tab in Event Director dashboard: Passport Management
+- [x] Table: all bowlers, pool party token status (active/disabled/redeemed), banquet token status
+- [x] Disable / Re-enable buttons per bowler per passport type
+- [x] Redemption count summary (e.g., 142/450 pool party redeemed)

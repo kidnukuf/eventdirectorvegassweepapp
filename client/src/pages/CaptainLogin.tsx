@@ -83,7 +83,7 @@ export default function CaptainLogin() {
       localStorage.setItem(BOWLER_ID_KEY, String(data.bowlerId));
       localStorage.setItem(BOWLER_IS_CAPTAIN_KEY, "1");
       toast.success("Account created! Welcome, Captain.");
-      navigate("/captain");
+      navigate("/captain-confirmation");
     },
     onError: (err) => {
       toast.error(err.message);

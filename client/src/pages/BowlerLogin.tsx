@@ -89,9 +89,9 @@ export default function BowlerLogin() {
       localStorage.setItem(BOWLER_IS_CAPTAIN_KEY, data.isCapitain ? "1" : "0");
       toast.success("Account created! Welcome to B.O.B. Roll-off Passport.");
       if (data.isCapitain) {
-        navigate("/captain");
+        navigate("/captain-confirmation");
       } else {
-        navigate("/bowler");
+        navigate("/bowler-confirmation");
       }
     },
     onError: (err) => {
