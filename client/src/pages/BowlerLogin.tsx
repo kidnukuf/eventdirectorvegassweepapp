@@ -139,11 +139,11 @@ export default function BowlerLogin() {
         >
           ← Home
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bob-header-group cursor-default select-none">
           <span className="text-2xl">🎳</span>
           <div className="flex flex-col leading-tight">
-            <span className="font-bold text-white text-base tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</span>
-            <span className="text-amber-300 text-xs font-semibold tracking-widest uppercase">Bowlers Orleans Bound</span>
+            <span className="bob-header-title font-bold text-white text-base tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</span>
+            <span className="bob-header-subtitle text-amber-300 text-xs font-semibold tracking-widest uppercase">Bowlers Orleans Bound</span>
           </div>
         </div>
         <div className="w-16" />

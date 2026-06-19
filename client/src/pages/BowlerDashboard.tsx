@@ -368,11 +368,11 @@ export default function BowlerDashboard() {
     <div className="bowler-portal-bg min-h-screen flex flex-col">
       {/* ── Header ── */}
       <header className="bowler-portal-header px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bob-header-group cursor-default select-none">
           <span className="text-xl">🎳</span>
           <div className="flex flex-col leading-tight">
-            <span className="font-bold text-white text-sm" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</span>
-            <span className="text-amber-300 text-xs font-semibold tracking-wider">Bowlers Orleans Bound</span>
+            <span className="bob-header-title font-bold text-white text-sm" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</span>
+            <span className="bob-header-subtitle text-amber-300 text-xs font-semibold tracking-wider">Bowlers Orleans Bound</span>
           </div>
         </div>
         <div className="flex items-center gap-2">

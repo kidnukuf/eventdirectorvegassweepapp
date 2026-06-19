@@ -37,7 +37,7 @@ export default function Home() {
             />
           </div>
           <h1
-            className="text-4xl md:text-6xl font-black mb-1 tracking-tight"
+            className="bob-header-title text-4xl md:text-6xl font-black mb-1 tracking-tight cursor-default select-none"
             style={{
               fontFamily: "'Orbitron', 'Rajdhani', sans-serif",
               background: "linear-gradient(135deg, #ffd700, #ff8c00, #00ffff)",

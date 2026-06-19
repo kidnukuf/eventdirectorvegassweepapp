@@ -66,6 +66,23 @@
 .text-2xl { font-size: 1.7rem   !important; line-height: 1.3 !important; }
 .text-3xl { font-size: 2.1rem   !important; line-height: 1.25 !important; }
 
+/* ─── B.O.B. Header Glow Effect ─────────────────────────────────── */
+.bob-header-title {
+  transition: text-shadow 0.3s cubic-bezier(0.23, 1, 0.32, 1), color 0.3s ease;
+}
+.bob-header-title:hover {
+  text-shadow: 0 0 12px #ffd700cc, 0 0 28px #ffd70088, 0 0 48px #ffd70044;
+  color: #ffe566;
+}
+.bob-header-subtitle {
+  transition: text-shadow 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease;
+}
+.bob-header-title:hover ~ .bob-header-subtitle,
+.bob-header-group:hover .bob-header-subtitle {
+  text-shadow: 0 0 8px #ffd70099, 0 0 18px #ffd70055;
+  opacity: 1;
+}
+
 /* ─── Neon Glow Utilities ────────────────────────────────────────── */
 .neon-gold {
   color: #ffd700;
@@ -357,6 +374,7 @@
 .bowler-btn-primary {
   background: linear-gradient(135deg, #f59e0b, #d97706) !important;
   color: #000 !important;
+  text-shadow: none !important;
   font-weight: 700 !important;
   border-radius: 0.75rem !important;
   height: 2.75rem !important;
@@ -367,7 +385,8 @@
 
 .bowler-btn-primary:hover {
   transform: translateY(-1px) !important;
-  box-shadow: 0 8px 20px rgba(245,158,11,0.4) !important;
+  box-shadow: 0 8px 24px rgba(245,158,11,0.55) !important;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
 }
 
 .bowler-btn-primary:active {
@@ -375,16 +394,18 @@
 }
 
 .bowler-btn-secondary {
-  background: rgba(255,255,255,0.1) !important;
+  background: rgba(255,255,255,0.15) !important;
   color: white !important;
-  border: 1px solid rgba(255,255,255,0.2) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
   border-radius: 0.625rem !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   transition: all 0.15s !important;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
 }
-
 .bowler-btn-secondary:hover {
-  background: rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.28) !important;
+  border-color: rgba(255,255,255,0.55) !important;
+  box-shadow: 0 4px 14px rgba(255,255,255,0.15) !important;
 }
 
 .bowler-info-box {
@@ -535,11 +556,18 @@
 }
 
 .captain-btn-secondary {
-  background: rgba(255,255,255,0.08) !important;
+  background: rgba(255,255,255,0.15) !important;
   color: white !important;
-  border: 1px solid rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
   border-radius: 0.625rem !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
+  transition: all 0.15s !important;
+}
+.captain-btn-secondary:hover {
+  background: rgba(255,255,255,0.28) !important;
+  border-color: rgba(255,255,255,0.55) !important;
+  box-shadow: 0 4px 14px rgba(255,255,255,0.15) !important;
 }
 
 .captain-link-input {
