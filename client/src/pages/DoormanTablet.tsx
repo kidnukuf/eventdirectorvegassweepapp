@@ -243,6 +243,18 @@ function PinPad({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
+// ─── Sound effects ───────────────────────────────────────────────────────────
+const STRIKE_SOUND = "/manus-storage/strike-success_748b3acc.wav";
+const BUZZER_SOUND = "/manus-storage/scan-denied_e1267ac8.wav";
+
+function playSound(url: string) {
+  try {
+    const audio = new Audio(url);
+    audio.volume = 0.85;
+    audio.play().catch(() => { /* autoplay blocked — ignore */ });
+  } catch { /* ignore */ }
+}
+
 // ─── Scanner UI ───────────────────────────────────────────────────────────────
 function TabletScanner({ onLock }: { onLock: () => void }) {
   const [tab, setTab] = useState<TabletTab>("passport");
@@ -299,10 +311,13 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
       if ("bowlerName" in data && data.bowlerName) setBowlerName(data.bowlerName);
       stopScanner();
       if (data.result === "granted") {
+        playSound(STRIKE_SOUND);
         setShowConfetti(true);
         setCheckmarkPop(true);
         setTimeout(() => setShowConfetti(false), 3500);
         setTimeout(() => setCheckmarkPop(false), 3000);
+      } else {
+        playSound(BUZZER_SOUND);
       }
     },
     onError: (err) => { setScanResult("invalid"); setScanMessage(err.message); stopScanner(); },
@@ -312,6 +327,7 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
     onSuccess: (data: Record<string, unknown>) => {
       if (data.success) {
         const name = String(data.bowlerName ?? "");
+        playSound(STRIKE_SOUND);
         setCheckInResult({ success: true, message: "ENTRY GRANTED", bowlerName: name });
         setLastGranted(name);
         setShowDenied(false);
@@ -321,12 +337,14 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
         setTimeout(() => setCheckmarkPop(false), 3000);
         setTimeout(() => setCheckInResult(null), 5000);
       } else {
+        playSound(BUZZER_SOUND);
         setCheckInResult({ success: false, message: `DENIED — ${data.error}` });
         setShowDenied(true);
         setTimeout(() => { setShowDenied(false); setCheckInResult(null); }, 4000);
       }
     },
     onError: (e) => {
+      playSound(BUZZER_SOUND);
       setCheckInResult({ success: false, message: `DENIED — ${e.message}` });
       setShowDenied(true);
       setTimeout(() => { setShowDenied(false); setCheckInResult(null); }, 4000);
