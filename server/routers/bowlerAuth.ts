@@ -13,7 +13,7 @@ import QRCode from "qrcode";
 import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { rawQuery } from "../db";
-
+import { notifyOwner } from "../_core/notification";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 const TOKEN_TTL = "30d";
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY ?? "";
@@ -248,6 +248,11 @@ export const bowlerAuthRouter = router({
       const bowler = await findBowlerByName(input.firstName, input.lastName, input.eventId, input.centerId);
 
       if (!bowler) {
+        // Notify ED of failed sign-up attempt
+        notifyOwner({
+          title: "⚠️ Unknown Bowler Sign-Up Attempt",
+          content: `Someone tried to sign up but was NOT found in the roster.\n\nName entered: ${input.firstName} ${input.lastName}\nCenter ID: ${input.centerId}\nIP: ${ip ?? "unknown"}\n\nIf this is a valid bowler, add them to the roster and re-import.`,
+        }).catch(() => {});
         throw new TRPCError({
           code: "NOT_FOUND",
           message:
@@ -289,6 +294,15 @@ export const bowlerAuthRouter = router({
 
       await rawQuery(`UPDATE bowlers SET ${updates.join(", ")} WHERE id = ?`, params);
 
+      // Notify ED of successful sign-up (differentiate captain vs bowler)
+      const isCapt = Boolean(bowler.isCapitain);
+      notifyOwner({
+        title: isCapt
+          ? `⭐ Team Captain Signed Up: ${bowler.legalFirstName ?? input.firstName} ${bowler.legalLastName ?? input.lastName}`
+          : `✅ Bowler Signed Up: ${bowler.legalFirstName ?? input.firstName} ${bowler.legalLastName ?? input.lastName}`,
+        content: `${isCapt ? "A TEAM CAPTAIN" : "A bowler"} has created their account.\n\nName: ${bowler.legalFirstName ?? input.firstName} ${bowler.legalLastName ?? input.lastName}\nCenter: ${bowler.centerName ?? "Unknown"}\nTeam: ${bowler.teamName ?? "Unknown"}\nBowler ID: ${String(bowler.scantronId ?? bowler.id).padStart(10, "0")}${isCapt ? "\n\n⚠️ This bowler is a TEAM CAPTAIN — they can verify their team members." : ""}`,
+      }).catch(() => {});
+
       const token = signToken({ bowlerId: bowler.id, role: "Bowler" });
       return { token, bowlerId: bowler.id, isCapitain: Boolean(bowler.isCapitain) };
     }),
@@ -313,6 +327,11 @@ export const bowlerAuthRouter = router({
       const bowler = await findBowlerByName(input.firstName, input.lastName, input.eventId);
 
       if (!bowler) {
+        // Notify ED of failed sign-in attempt (name not found)
+        notifyOwner({
+          title: "⚠️ Failed Sign-In: Name Not Found",
+          content: `Someone tried to sign in but their name was not found in the roster.\n\nName entered: ${input.firstName} ${input.lastName}\nIP: ${ip ?? "unknown"}`,
+        }).catch(() => {});
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No bowler found with that name. Please check your spelling.",

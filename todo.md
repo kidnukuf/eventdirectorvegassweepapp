@@ -155,7 +155,7 @@
 - [x] tRPC: bowlerAuth.scanPassport — validate token (type: pool|banquet), check not null, check not used, mark used, return result + bowler name
 - [x] tRPC: bowlerAuth.disablePassport / enablePassport — Event Director only
 - [x] tRPC: bowlerAuth.getPassportStatus — list all bowlers with token/used status for Event Director
-- [ ] Google Sheet write-back: HYPERLINK formula for pool and banquet QR URLs written after sign-up (deferred — requires Google Service Account setup)
+- [~] Google Sheet write-back: HYPERLINK formula for pool and banquet QR URLs written after sign-up (DEFERRED — requires Google Service Account credentials from user, not blocking for event)
 
 ### Bowler Post-Sign-Up Confirmation Page (/bowler-confirmation)
 - [x] Step 1: 10-digit zero-padded bowler ID prominently displayed, phone + email entry fields, submit
