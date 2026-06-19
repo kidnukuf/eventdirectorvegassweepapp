@@ -198,3 +198,9 @@
 - [x] Build cloud sync-back endpoint: offline.syncRedemptions tRPC mutation — accepts batched redemptions, deduplicates, writes to cloud DB
 - [x] Add "Download Offline Package" + "Download Bowler Snapshot" buttons to admin dashboard Doormen tab
 - [x] Add auto-sync: offline server polls every 30s, pushes queued redemptions to cloud when internet detected
+
+## Phase 17: QR Visibility, Dark Portals, Font Size, Google Sheet Write-back
+- [ ] Fix QR codes: make each QR visible on button click (not hidden), banquet and pool party as separate clearly-labeled cards
+- [ ] Darken portal card backgrounds to near-black/dark-glass, add colored text-shadow/outline for all text
+- [ ] Increase all portal font sizes by 50% globally
+- [ ] Google Sheet write-back: after confirmed bowler login, write banquet QR URL and pool party QR URL to the sheet

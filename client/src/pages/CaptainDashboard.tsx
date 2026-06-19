@@ -11,6 +11,120 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession } from "./BowlerLogin";
 
+// ─── Shared helpers ─────────────────────────────────────────────────────────
+function downloadQR(dataUrl: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+interface PassportBoxProps {
+  title: string;
+  icon: string;
+  subtitle: string;
+  checkInTime?: string;
+  entranceFlow: string;
+  qrDataUrl: string | null | undefined;
+  tokenUsed: boolean;
+  eligible: boolean;
+}
+
+function PassportBox({ title, icon, subtitle, checkInTime, entranceFlow, qrDataUrl, tokenUsed, eligible }: PassportBoxProps) {
+  const [revealed, setRevealed] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
+  function handleReveal() {
+    setAnimating(true);
+    setRevealed(true);
+    setTimeout(() => setAnimating(false), 700);
+  }
+
+  return (
+    <div className="captain-card space-y-4" style={{ background: "rgba(10,10,20,0.88)", border: "1.5px solid rgba(255,200,50,0.25)" }}>
+      <div className="flex items-center gap-3">
+        <span className="text-4xl">{icon}</span>
+        <div>
+          <h3 className="text-white font-extrabold text-xl" style={{ textShadow: "0 0 8px rgba(255,200,50,0.6)" }}>{title}</h3>
+          <p className="text-amber-200 text-sm font-semibold">{subtitle}</p>
+        </div>
+      </div>
+      {checkInTime && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "rgba(255,180,0,0.12)", border: "1px solid rgba(255,180,0,0.3)" }}>
+          <span className="text-xl">⏰</span>
+          <div>
+            <p className="text-amber-200 text-sm font-semibold">Check-in Begins</p>
+            <p className="text-amber-300 font-bold text-base">{checkInTime}</p>
+          </div>
+        </div>
+      )}
+      {!eligible ? (
+        <div className="text-center py-5 px-4 rounded-xl" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)" }}>
+          <p className="text-white font-semibold text-base leading-relaxed" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>
+            If you are interested in attending, please see your team captain before the event begins.
+          </p>
+        </div>
+      ) : tokenUsed ? (
+        <div className="text-center py-5 px-4 rounded-xl" style={{ background: "rgba(0,80,40,0.4)", border: "1px solid rgba(52,211,153,0.4)" }}>
+          <p className="text-emerald-300 font-bold text-lg" style={{ textShadow: "0 0 8px rgba(52,211,153,0.5)" }}>✓ Passport Redeemed</p>
+          <p className="text-white text-sm mt-2" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>This QR code has been scanned at the door.</p>
+        </div>
+      ) : qrDataUrl ? (
+        <div className="flex flex-col items-center gap-4">
+          {!revealed ? (
+            <button
+              onClick={handleReveal}
+              className="w-full py-5 rounded-2xl flex flex-col items-center gap-3 cursor-pointer select-none transition-all duration-200 active:scale-95"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,180,0,0.18) 0%, rgba(255,100,0,0.12) 100%)",
+                border: "2px dashed rgba(255,180,0,0.5)",
+                boxShadow: "0 0 20px rgba(255,180,0,0.15)",
+              }}
+            >
+              <span className="text-5xl">{icon}</span>
+              <span className="text-amber-300 font-extrabold text-xl" style={{ textShadow: "0 0 10px rgba(255,180,0,0.7)" }}>
+                Tap to Show QR Code
+              </span>
+              <span className="text-white text-sm" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>{title}</span>
+            </button>
+          ) : (
+            <div className={`flex flex-col items-center gap-3 w-full transition-all duration-700 ease-out ${animating ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}>
+              <div className="relative">
+                <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ boxShadow: "0 0 30px rgba(255,180,0,0.4), 0 0 60px rgba(255,180,0,0.2)" }} />
+                <div className="p-4 rounded-2xl bg-white shadow-2xl">
+                  <img src={qrDataUrl} alt={`${title} QR Code`} className="w-52 h-52 rounded-lg" />
+                </div>
+              </div>
+              <p className="text-white font-semibold text-sm text-center" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
+                Present this QR code at the {title.toLowerCase()} entrance
+              </p>
+              <Button
+                size="sm"
+                className="captain-btn-secondary w-full text-base py-3"
+                onClick={() => downloadQR(qrDataUrl, `BOB-${title.replace(/\s+/g, "-")}-Passport.png`)}
+              >
+                ⬇ Download Ticket
+              </Button>
+              <button onClick={() => setRevealed(false)} className="text-white/50 text-xs underline mt-1">Hide QR</button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-3">
+          <p className="text-white/70 text-sm mb-3" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>Your QR passport is being prepared.</p>
+          <p className="text-white/50 text-xs">Please sign out and sign back in to refresh.</p>
+        </div>
+      )}
+      <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+        <p className="text-white/85 text-xs font-semibold mb-1">🚪 How Entry Works</p>
+        <p className="text-white/85 text-xs leading-relaxed">{entranceFlow}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Animated "Lane to Banquet" placard (shared with BowlerDashboard) ─────────
 function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
   laneToEvent?: string | null;
@@ -356,6 +470,37 @@ export default function CaptainDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* ── QR Passports ── */}
+        <div className="pt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-white/20" />
+            <span className="text-white/40 text-xs font-semibold tracking-widest uppercase">QR Passports</span>
+            <div className="flex-1 h-px bg-white/20" />
+          </div>
+        </div>
+
+        <PassportBox
+          title="Banquet Dinner Passport"
+          icon="🍽️"
+          subtitle="Funtime Team Challenge 2026 — Banquet Dinner"
+          checkInTime="6:00 PM — Check-in begins at 5:30 PM"
+          entranceFlow="Present this QR code at the banquet hall entrance. A staff member will scan your code — once scanned it cannot be reused. Wristbands will be issued at the door for re-entry."
+          qrDataUrl={p.banquetQR}
+          tokenUsed={Boolean((p as any).banquetUsed)}
+          eligible={p.banquetToken !== null && p.banquetToken !== undefined}
+        />
+
+        <PassportBox
+          title="Pool Party Passport"
+          icon="🏊"
+          subtitle="Funtime Team Challenge 2026 — Pool Party"
+          checkInTime="Pool Party — Check-in begins at 2:00 PM"
+          entranceFlow="Show this QR code to the pool party doorman. Your code will be scanned and marked as used — one scan per person. A wristband will be issued for re-entry."
+          qrDataUrl={p.poolPartyQR}
+          tokenUsed={Boolean((p as any).poolPartyUsed)}
+          eligible={p.poolPartyToken !== null && p.poolPartyToken !== undefined}
+        />
 
         {/* ── Responsibilities ── */}
         <div className="captain-card">
