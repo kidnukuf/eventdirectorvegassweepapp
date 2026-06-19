@@ -731,6 +731,8 @@ export const appRouter = router({
             const squadTimeVal = String(row["Squad Time"] ?? row["squad_time"] ?? "").trim() || undefined;
             const laneRaw = String(row["Lane #"] ?? row["Lane"] ?? row["lane"] ?? "").trim();
             const laneNumber = laneRaw ? (parseInt(laneRaw) || undefined) : undefined;
+            // Column 44 — "Lane to Event" / "Lane to Banquet" directional info
+            const laneToEvent = String(row["Lane to Event"] ?? row["Lane to Banquet"] ?? row["lane_to_event"] ?? row["LaneToEvent"] ?? "").trim() || undefined;
 
             if (existing.length > 0) {
               // Update existing
@@ -741,7 +743,7 @@ export const appRouter = router({
                 notes: notes || undefined,
                 phone: phone || undefined, email: email || undefined,
                 sanctionNumber, gamesPlayed, bestAverage, tshirtSize,
-                under21, leagueMember, squadTime: squadTimeVal, laneNumber,
+                under21, leagueMember, squadTime: squadTimeVal, laneNumber, laneToEvent,
               });
               if (checkinDate || checkoutDate || roomType) {
                 await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
@@ -757,12 +759,12 @@ export const appRouter = router({
               // Insert new bowler
               await rawQuery(
                 `INSERT INTO bowlers (eventId, leagueId, teamId, centerId, scantronId, bowlerPosition, legalFirstName, legalLastName, isCapitain, phone, email, notes, registrationStatus,
-                   sanctionNumber, gamesPlayed, bestAverage, tshirtSize, under21, leagueMember, squadTime, laneNumber)
-                 VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pre_registered', ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   sanctionNumber, gamesPlayed, bestAverage, tshirtSize, under21, leagueMember, squadTime, laneNumber, laneToEvent)
+                 VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pre_registered', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [input.eventId, teamId, center.id, scantronId, bb, firstName, lastName, isCapt ? 1 : 0,
                  phone || null, email || null, notes || null,
                  sanctionNumber || null, gamesPlayed ?? null, bestAverage ?? null, tshirtSize || null,
-                 under21 ? 1 : 0, leagueMember ? 1 : 0, squadTimeVal || null, laneNumber ?? null]
+                 under21 ? 1 : 0, leagueMember ? 1 : 0, squadTimeVal || null, laneNumber ?? null, laneToEvent || null]
               );
               const newBowler = await rawQuery("SELECT id FROM bowlers WHERE scantronId = ? LIMIT 1", [scantronId]) as Record<string, unknown>[];
               const bowlerId = newBowler[0]?.id as number;

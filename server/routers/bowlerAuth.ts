@@ -132,6 +132,7 @@ async function getBowlerProfile(bowlerId: number) {
     centerName: string | null;
     laneNumber: number | null;
     squadTime: string | null;
+    laneToEvent: string | null;
     eventName: string | null;
     bowlingDate: string | null;
     // hotel
@@ -142,15 +143,21 @@ async function getBowlerProfile(bowlerId: number) {
     // payment
     totalAmountDue: string | null;
     paid: number | null;
+    // passport tokens
+    poolPartyToken: string | null;
+    poolPartyUsed: number;
+    banquetToken: string | null;
+    banquetUsed: number;
   }>(
     `SELECT b.id, b.legalFirstName, b.legalLastName, b.preferredName,
             b.email, b.phone, b.scantronId, b.registrationStatus,
             b.isCapitain, b.captainVerified, b.teamId, b.centerId,
             t.teamName, t.teamCode, bc.centerName,
-            b.laneNumber, b.squadTime,
+            b.laneNumber, b.squadTime, b.laneToEvent,
             e.eventName, e.bowlingDate,
             h.hotelName, h.checkinDate, h.checkoutDate, h.roomType,
-            p.totalAmountDue, p.paid
+            p.totalAmountDue, p.paid,
+            b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed
      FROM bowlers b
      LEFT JOIN teams t ON t.id = b.teamId
      LEFT JOIN bowling_centers bc ON bc.id = b.centerId
@@ -161,7 +168,19 @@ async function getBowlerProfile(bowlerId: number) {
      LIMIT 1`,
     [bowlerId]
   );
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  // Generate QR data URLs for passport tokens
+  const appOrigin = process.env.APP_ORIGIN ?? "https://vegasweeps-y8eywesk.manus.space";
+  let poolPartyQR: string | null = null;
+  let banquetQR: string | null = null;
+  if (row.poolPartyToken && !row.poolPartyUsed) {
+    poolPartyQR = await QRCode.toDataURL(`${appOrigin}/scan/pool/${row.poolPartyToken}`, { width: 300, margin: 2 });
+  }
+  if (row.banquetToken && !row.banquetUsed) {
+    banquetQR = await QRCode.toDataURL(`${appOrigin}/scan/banquet/${row.banquetToken}`, { width: 300, margin: 2 });
+  }
+  return { ...row, poolPartyQR, banquetQR };
 }
 
 // ─── SHARED: get team roster for captain dashboard ────────────────────────────
@@ -374,7 +393,7 @@ export const bowlerAuthRouter = router({
       const rows = await rawQuery<{
         id: number; legalFirstName: string; legalLastName: string;
         scantronId: string | null; phone: string | null; email: string | null;
-        squadTime: string | null; laneNumber: number | null;
+        squadTime: string | null; laneNumber: number | null; laneToEvent: string | null;
         teamName: string | null; centerName: string | null;
         eventName: string | null; startDate: string | null; endDate: string | null; bowlingDate: string | null;
         poolPartyToken: string | null; poolPartyUsed: number;
@@ -382,7 +401,7 @@ export const bowlerAuthRouter = router({
         isCapitain: number;
       }>(
         `SELECT b.id, b.legalFirstName, b.legalLastName, b.scantronId,
-                b.phone, b.email, b.squadTime, b.laneNumber,
+                b.phone, b.email, b.squadTime, b.laneNumber, b.laneToEvent,
                 b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed,
                 b.isCapitain,
                 t.teamName, bc.centerName,

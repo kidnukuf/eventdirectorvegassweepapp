@@ -1,18 +1,27 @@
 /**
  * BowlerDashboard — personal portal for a signed-in bowler
- * Shows: profile card, QR ticket, team/lane/event info, hotel & payment status
- * Design: warm consumer app — navy/purple gradient, gold highlights
+ * Layout (top → bottom):
+ *  1. Header
+ *  2. Profile card
+ *  3. Animated "Lane to Banquet" clickable placard
+ *  4. Event Details card
+ *  5. Hotel card (if present)
+ *  6. Payment card (if present)
+ *  7. Contact Info card
+ *  8. ── QR PASSPORT SECTION ──
+ *     a. My Entry Ticket (bowling check-in)
+ *     b. Banquet Dinner Passport QR
+ *     c. Pool Party Passport QR
  */
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession, BOWLER_IS_CAPTAIN_KEY } from "./BowlerLogin";
 
-// ─── Status badge colors ──────────────────────────────────────────────────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     pre_registered: "bg-zinc-600 text-zinc-200",
@@ -35,7 +44,117 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ─── QR Ticket component ──────────────────────────────────────────────────────
+// ─── Info row ─────────────────────────────────────────────────────────────────
+function InfoRow({ icon, label, value }: { icon: string; label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-3 py-2 border-b border-white/10 last:border-0">
+      <span className="text-lg w-6 text-center flex-shrink-0">{icon}</span>
+      <div>
+        <p className="text-white/50 text-xs">{label}</p>
+        <p className="text-white font-medium text-sm">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Animated "Lane to Banquet" placard ───────────────────────────────────────
+function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
+  laneToEvent?: string | null;
+  laneNumber?: number | null;
+  squadTime?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
+  function handleClick() {
+    if (!open) {
+      setAnimating(true);
+      setTimeout(() => setAnimating(false), 600);
+    }
+    setOpen(o => !o);
+  }
+
+  const hasInfo = laneToEvent || laneNumber || squadTime;
+  if (!hasInfo) return null;
+
+  return (
+    <div
+      className={`bowler-card cursor-pointer select-none transition-all duration-300 ${open ? "ring-2 ring-amber-400/60" : "hover:ring-1 hover:ring-amber-400/30"}`}
+      onClick={handleClick}
+      role="button"
+      aria-expanded={open}
+    >
+      {/* Collapsed header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🗺️</span>
+          <div>
+            <p className="text-amber-300 font-bold text-sm tracking-wide">Lane to Banquet</p>
+            <p className="text-white/50 text-xs">Tap to see your event directions</p>
+          </div>
+        </div>
+        <span
+          className={`text-amber-300 text-lg transition-transform duration-300 ${open ? "rotate-90" : "rotate-0"}`}
+          aria-hidden="true"
+        >
+          ▶
+        </span>
+      </div>
+
+      {/* Expanded content with slide-down animation */}
+      <div
+        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-96 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
+      >
+        {/* Animated shimmer bar when opening */}
+        {animating && (
+          <div className="h-0.5 w-full rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 animate-pulse" />
+        )}
+
+        <div className="space-y-3 pt-1 border-t border-white/10">
+          {laneNumber && (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🎳</span>
+              <div>
+                <p className="text-white/50 text-xs">Your Starting Lane</p>
+                <p className="text-white font-bold text-base">Lane {laneNumber}</p>
+              </div>
+            </div>
+          )}
+          {squadTime && (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🕐</span>
+              <div>
+                <p className="text-white/50 text-xs">Squad Time</p>
+                <p className="text-white font-semibold text-sm">{squadTime}</p>
+              </div>
+            </div>
+          )}
+          {laneToEvent && (
+            <div className="flex items-start gap-3">
+              <span className="text-lg">📍</span>
+              <div>
+                <p className="text-white/50 text-xs">Lane to Banquet Directions</p>
+                <p className="text-amber-200 font-semibold text-sm leading-relaxed">{laneToEvent}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Static entrance flow info */}
+          <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
+            <p className="text-white/70 text-xs leading-relaxed">
+              Lines can be long at event entry. Please plan to arrive at least 30 minutes before your squad time.
+              Have your QR Passport ready on your phone for quick scanning at the door.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── QR Ticket (bowling entry) ────────────────────────────────────────────────
 function QRTicket({ bowlerId, scantronId }: { bowlerId: number; scantronId?: string | null }) {
   const tokenQuery = trpc.tokens.getForBowler.useQuery({ bowlerId });
   const generateToken = trpc.tokens.generate.useMutation({
@@ -72,15 +191,98 @@ function QRTicket({ bowlerId, scantronId }: { bowlerId: number; scantronId?: str
   );
 }
 
-// ─── Info row ─────────────────────────────────────────────────────────────────
-function InfoRow({ icon, label, value }: { icon: string; label: string; value?: string | null }) {
-  if (!value) return null;
+// ─── Passport QR box (banquet / pool party) ───────────────────────────────────
+interface PassportBoxProps {
+  title: string;
+  icon: string;
+  subtitle: string;
+  checkInTime?: string;
+  entranceFlow: string;
+  qrDataUrl: string | null | undefined;
+  tokenUsed: boolean;
+  eligible: boolean;
+}
+
+function PassportBox({ title, icon, subtitle, checkInTime, entranceFlow, qrDataUrl, tokenUsed, eligible }: PassportBoxProps) {
+  const [generating, setGenerating] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+
+  // Animate QR reveal on mount if eligible
+  useEffect(() => {
+    if (eligible && qrDataUrl && !tokenUsed) {
+      const t = setTimeout(() => setRevealed(true), 150);
+      return () => clearTimeout(t);
+    }
+  }, [eligible, qrDataUrl, tokenUsed]);
+
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-white/10 last:border-0">
-      <span className="text-lg w-6 text-center flex-shrink-0">{icon}</span>
-      <div>
-        <p className="text-white/50 text-xs">{label}</p>
-        <p className="text-white font-medium text-sm">{value}</p>
+    <div className="bowler-card space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <span className="text-3xl">{icon}</span>
+        <div>
+          <h3 className="text-white font-bold text-base">{title}</h3>
+          <p className="text-white/50 text-xs">{subtitle}</p>
+        </div>
+      </div>
+
+      {/* Check-in time */}
+      {checkInTime && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+          <span className="text-base">⏰</span>
+          <div>
+            <p className="text-white/50 text-xs">Check-in Begins</p>
+            <p className="text-amber-300 font-semibold text-sm">{checkInTime}</p>
+          </div>
+        </div>
+      )}
+
+      {/* QR code area */}
+      {!eligible ? (
+        <div className="text-center py-4 px-3 rounded-xl bg-white/5 border border-white/10">
+          <p className="text-white/40 text-sm leading-relaxed">
+            If you are interested in attending, please see your team captain before the event begins.
+          </p>
+        </div>
+      ) : tokenUsed ? (
+        <div className="text-center py-4 px-3 rounded-xl bg-emerald-900/30 border border-emerald-500/30">
+          <p className="text-emerald-400 font-semibold text-sm">✓ Passport Redeemed</p>
+          <p className="text-white/40 text-xs mt-1">This QR code has been scanned at the door.</p>
+        </div>
+      ) : qrDataUrl ? (
+        <div className="flex flex-col items-center gap-3">
+          {/* Animated QR reveal */}
+          <div
+            className={`transition-all duration-700 ease-out ${revealed ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
+          >
+            <div className="relative">
+              {/* Animated border glow while "generating" */}
+              {generating && (
+                <div className="absolute inset-0 rounded-2xl border-2 border-amber-400 animate-ping opacity-30 pointer-events-none" />
+              )}
+              <div className="p-3 rounded-2xl bg-white shadow-2xl">
+                <img src={qrDataUrl} alt={`${title} QR Code`} className="w-44 h-44 rounded-lg" />
+              </div>
+            </div>
+          </div>
+          <p className="text-white/50 text-xs text-center">Present this QR code at the {title.toLowerCase()} entrance</p>
+        </div>
+      ) : (
+        <div className="text-center py-3">
+          <Button
+            className="bowler-btn-secondary"
+            onClick={() => setGenerating(true)}
+            disabled={generating}
+          >
+            {generating ? "Generating…" : `Generate ${title} QR`}
+          </Button>
+        </div>
+      )}
+
+      {/* Entrance flow explanation */}
+      <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+        <p className="text-white/50 text-xs font-semibold mb-1">🚪 How Entry Works</p>
+        <p className="text-white/70 text-xs leading-relaxed">{entranceFlow}</p>
       </div>
     </div>
   );
@@ -134,6 +336,10 @@ export default function BowlerDashboard() {
 
   const displayName = p.preferredName || `${p.legalFirstName} ${p.legalLastName}`;
 
+  // Eligibility: token present means eligible (null = disabled by Event Director)
+  const banquetEligible = p.banquetToken !== null && p.banquetToken !== undefined;
+  const poolEligible = p.poolPartyToken !== null && p.poolPartyToken !== undefined;
+
   return (
     <div className="bowler-portal-bg min-h-screen flex flex-col">
       {/* ── Header ── */}
@@ -160,7 +366,7 @@ export default function BowlerDashboard() {
 
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-lg mx-auto w-full space-y-4">
 
-        {/* ── Profile Card ── */}
+        {/* ── 1. Profile Card ── */}
         <div className="bowler-card">
           <div className="flex items-center gap-4">
             <div className="bowler-avatar">
@@ -181,15 +387,14 @@ export default function BowlerDashboard() {
           </div>
         </div>
 
-        {/* ── QR Ticket ── */}
-        <div className="bowler-card text-center">
-          <h3 className="text-white font-semibold mb-4 flex items-center justify-center gap-2">
-            <span>🎫</span> My Entry Ticket
-          </h3>
-          <QRTicket bowlerId={p.id} scantronId={p.scantronId} />
-        </div>
+        {/* ── 2. Lane to Banquet animated placard ── */}
+        <LaneToBanquetPlacard
+          laneToEvent={p.laneToEvent}
+          laneNumber={p.laneNumber}
+          squadTime={p.squadTime}
+        />
 
-        {/* ── Event Info ── */}
+        {/* ── 3. Event Details ── */}
         <div className="bowler-card">
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
             <span>📅</span> Event Details
@@ -197,12 +402,10 @@ export default function BowlerDashboard() {
           <InfoRow icon="🏆" label="Event" value={p.eventName ?? undefined} />
           <InfoRow icon="📍" label="Bowling Center" value={p.centerName ?? undefined} />
           <InfoRow icon="👥" label="Team" value={p.teamName ? `${p.teamName} (${p.teamCode})` : undefined} />
-          <InfoRow icon="🎳" label="Lane" value={p.laneNumber ? `Lane ${p.laneNumber}` : undefined} />
-          <InfoRow icon="🕐" label="Squad Time" value={p.squadTime ?? undefined} />
           <InfoRow icon="📆" label="Bowling Date" value={p.bowlingDate ?? undefined} />
         </div>
 
-        {/* ── Hotel Info ── */}
+        {/* ── 4. Hotel Info ── */}
         {p.hotelName && (
           <div className="bowler-card">
             <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
@@ -215,7 +418,7 @@ export default function BowlerDashboard() {
           </div>
         )}
 
-        {/* ── Payment Status ── */}
+        {/* ── 5. Payment Status ── */}
         {p.totalAmountDue && (
           <div className="bowler-card">
             <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
@@ -236,7 +439,7 @@ export default function BowlerDashboard() {
           </div>
         )}
 
-        {/* ── Contact Info ── */}
+        {/* ── 6. Contact Info ── */}
         <div className="bowler-card">
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
             <span>📞</span> My Contact Info
@@ -249,6 +452,61 @@ export default function BowlerDashboard() {
           )}
         </div>
 
+        {/* ══════════════════════════════════════════════════════════════════════
+            QR PASSPORT SECTION — always at the bottom
+        ══════════════════════════════════════════════════════════════════════ */}
+        <div className="pt-2">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 h-px bg-white/20" />
+            <span className="text-white/40 text-xs font-semibold tracking-widest uppercase">QR Passports</span>
+            <div className="flex-1 h-px bg-white/20" />
+          </div>
+        </div>
+
+        {/* ── 7. My Entry Ticket (bowling check-in QR) ── */}
+        <div className="bowler-card text-center">
+          <h3 className="text-white font-semibold mb-4 flex items-center justify-center gap-2">
+            <span>🎫</span> My Entry Ticket
+          </h3>
+          <p className="text-white/50 text-xs mb-4">
+            Present this QR code at the bowling center entrance on your squad day.
+          </p>
+          <QRTicket bowlerId={p.id} scantronId={p.scantronId} />
+          <div className="mt-4 p-3 rounded-xl bg-white/5 border border-white/10 text-left">
+            <p className="text-white/50 text-xs font-semibold mb-1">🚪 How Entry Works</p>
+            <p className="text-white/70 text-xs leading-relaxed">
+              A doorman will scan your QR code at the entrance. Once scanned, your ticket is marked as used.
+              You will receive a wristband for re-entry. Please arrive at least 30 minutes before your squad time — lines can be long.
+            </p>
+          </div>
+        </div>
+
+        {/* ── 8. Banquet Dinner Passport ── */}
+        <PassportBox
+          title="Banquet Dinner Passport"
+          icon="🍽️"
+          subtitle="Funtime Team Challenge 2026 — Banquet Dinner"
+          checkInTime="6:00 PM — Check-in begins at 5:30 PM"
+          entranceFlow="Present this QR code at the banquet hall entrance. A staff member will scan your code — once scanned it cannot be reused. Wristbands will be issued at the door for re-entry. If you are not on the eligible list, please see your team captain before the event begins."
+          qrDataUrl={p.banquetQR}
+          tokenUsed={Boolean(p.banquetUsed)}
+          eligible={banquetEligible}
+        />
+
+        {/* ── 9. Pool Party Passport ── */}
+        <PassportBox
+          title="Pool Party Passport"
+          icon="🏊"
+          subtitle="Funtime Team Challenge 2026 — Pool Party"
+          checkInTime="Pool Party — Check-in begins at 2:00 PM"
+          entranceFlow="Show this QR code to the pool party doorman. Your code will be scanned and marked as used — one scan per person. A wristband will be issued for re-entry. If you believe you should be eligible but don't see a QR code, please contact your team captain or the Event Director."
+          qrDataUrl={p.poolPartyQR}
+          tokenUsed={Boolean(p.poolPartyUsed)}
+          eligible={poolEligible}
+        />
+
+        {/* Bottom spacer */}
+        <div className="h-8" />
       </div>
     </div>
   );

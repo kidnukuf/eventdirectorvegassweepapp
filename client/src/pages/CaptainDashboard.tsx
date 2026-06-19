@@ -3,14 +3,103 @@
  * Shows: captain profile, team roster, verify buttons, completion ring, shareable link
  * Design: bold, organized — darker navy with gold team accents, table-centric layout
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession } from "./BowlerLogin";
+
+// ─── Animated "Lane to Banquet" placard (shared with BowlerDashboard) ─────────
+function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
+  laneToEvent?: string | null;
+  laneNumber?: number | null;
+  squadTime?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
+  function handleClick() {
+    if (!open) {
+      setAnimating(true);
+      setTimeout(() => setAnimating(false), 600);
+    }
+    setOpen(o => !o);
+  }
+
+  const hasInfo = laneToEvent || laneNumber || squadTime;
+  if (!hasInfo) return null;
+
+  return (
+    <div
+      className={`captain-card cursor-pointer select-none transition-all duration-300 ${open ? "ring-2 ring-amber-400/60" : "hover:ring-1 hover:ring-amber-400/30"}`}
+      onClick={handleClick}
+      role="button"
+      aria-expanded={open}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🗺️</span>
+          <div>
+            <p className="text-amber-300 font-bold text-sm tracking-wide">Lane to Banquet</p>
+            <p className="text-white/50 text-xs">Tap to see your event directions</p>
+          </div>
+        </div>
+        <span
+          className={`text-amber-300 text-lg transition-transform duration-300 ${open ? "rotate-90" : "rotate-0"}`}
+          aria-hidden="true"
+        >
+          ▶
+        </span>
+      </div>
+
+      <div
+        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-96 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
+      >
+        {animating && (
+          <div className="h-0.5 w-full rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 animate-pulse" />
+        )}
+        <div className="space-y-3 pt-1 border-t border-white/10">
+          {laneNumber && (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🎳</span>
+              <div>
+                <p className="text-white/50 text-xs">Your Starting Lane</p>
+                <p className="text-white font-bold text-base">Lane {laneNumber}</p>
+              </div>
+            </div>
+          )}
+          {squadTime && (
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🕐</span>
+              <div>
+                <p className="text-white/50 text-xs">Squad Time</p>
+                <p className="text-white font-semibold text-sm">{squadTime}</p>
+              </div>
+            </div>
+          )}
+          {laneToEvent && (
+            <div className="flex items-start gap-3">
+              <span className="text-lg">📍</span>
+              <div>
+                <p className="text-white/50 text-xs">Lane to Banquet Directions</p>
+                <p className="text-amber-200 font-semibold text-sm leading-relaxed">{laneToEvent}</p>
+              </div>
+            </div>
+          )}
+          <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
+            <p className="text-white/70 text-xs leading-relaxed">
+              As team captain, please ensure your team arrives at least 30 minutes before squad time.
+              Have all QR Passports ready for quick scanning at the door.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Completion ring (SVG) ────────────────────────────────────────────────────
 function CompletionRing({ verified, total }: { verified: number; total: number }) {
@@ -179,6 +268,13 @@ export default function CaptainDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Lane to Banquet placard ── */}
+        <LaneToBanquetPlacard
+          laneToEvent={p.laneToEvent}
+          laneNumber={p.laneNumber}
+          squadTime={p.squadTime}
+        />
 
         {/* ── Roster Table ── */}
         <div className="captain-card">

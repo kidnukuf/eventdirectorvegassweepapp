@@ -128,6 +128,8 @@ export const bowlers = mysqlTable("bowlers", {
   leagueMember: boolean("leagueMember").default(false),
   squadTime: varchar("squadTime", { length: 50 }),
   laneNumber: int("laneNumber"),
+  // Lane-to-event info (column 44 in import sheet — e.g. "Lanes 1-4 → Banquet Hall A")
+  laneToEvent: text("laneToEvent"),
   // Passport QR tokens (pool party + banquet dinner)
   poolPartyToken: varchar("poolPartyToken", { length: 64 }).unique(),
   poolPartyUsed: boolean("poolPartyUsed").default(false).notNull(),
