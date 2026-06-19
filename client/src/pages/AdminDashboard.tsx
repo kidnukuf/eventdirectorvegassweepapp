@@ -528,9 +528,21 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
 
   const validateToken = trpc.tokens.validate.useMutation({
     onSuccess: (data) => {
-      if ((data as Record<string, unknown>).isTest) setTestResult("✅ TEST QR SYSTEM WORKING — Token scanned and invalidated successfully");
-      else if (data.success) setTestResult("✅ VALID — Bowler checked in");
-      else setTestResult(`❌ ${(data as Record<string, unknown>).error}`);
+      const isTest = (data as Record<string, unknown>).isTest;
+      if (activeTab === "scan") {
+        // Admin scan tab — show result in adminScanResult
+        if (isTest) setAdminScanResult("✅ TEST QR — System working");
+        else if (data.success) {
+          const name = (data as Record<string,unknown>).bowlerName as string | undefined;
+          setAdminScanResult(`✅ CHECKED IN${name ? " — " + name : ""}`);
+        } else setAdminScanResult(`❌ ${(data as Record<string, unknown>).error ?? "Invalid token"}`);
+        stopAdminScanner();
+      } else {
+        // QR Test tab
+        if (isTest) setTestResult("✅ TEST QR SYSTEM WORKING — Token scanned and invalidated successfully");
+        else if (data.success) setTestResult("✅ VALID — Bowler checked in");
+        else setTestResult(`❌ ${(data as Record<string, unknown>).error}`);
+      }
     },
   });
 
@@ -1058,6 +1070,18 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
 
         {activeTab === "unmatched" && (
           <div>
+            {/* Help flip-card */}
+            <div className="relative mb-4">
+              <button onClick={() => toggleHelp("unmatched")} className="absolute top-0 right-0 w-7 h-7 rounded-full bg-[#2a2a2a] border border-white/10 text-gray-500 hover:text-yellow-400 hover:border-yellow-500/40 text-xs font-bold transition-all z-10">?</button>
+              {openHelp === "unmatched" && (
+                <div className="bg-[#1a1a1a] border border-yellow-500/30 rounded-2xl p-5 mb-4 text-sm text-gray-300 leading-relaxed" style={{ animation: "flipIn 0.25s ease-out" }}>
+                  <h3 className="text-yellow-400 font-bold mb-2">⚠️ Unmatched Sign-Ups — How It Works</h3>
+                  <p className="mb-2">An unmatched sign-up occurs when a bowler creates an account but the system cannot find their pre-registered record. This usually happens due to a name spelling difference between what they typed and what is in the roster.</p>
+                  <p className="mb-2"><strong>To resolve:</strong> Find the bowler in this list, then click their name to open the match panel. Search for their correct record in the roster and click Link. Their account will be merged with the correct pre-registered record.</p>
+                  <p><strong>Prevention:</strong> Remind bowlers to enter their name exactly as it appears on their registration. The system is case-insensitive but sensitive to extra spaces or middle names.</p>
+                </div>
+              )}
+            </div>
             <h2 className="text-xl font-bold text-red-400 mb-2">⚠️ Unmatched Sign-Ups</h2>
             <p className="text-gray-400 text-sm mb-5">These bowlers signed up but could not be matched to a pre-registered record. Link them manually to an existing bowler record, or mark as new.</p>
             {unmatchedBowlers.length === 0 ? (
