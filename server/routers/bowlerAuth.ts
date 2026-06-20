@@ -14,6 +14,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { rawQuery } from "../db";
 import { notifyOwner } from "../_core/notification";
+import { writeQRCodesToSheet } from "../googleSheets";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 const TOKEN_TTL = "30d";
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY ?? "";
@@ -351,6 +352,22 @@ export const bowlerAuthRouter = router({
       }
 
       const token = signToken({ bowlerId: bowler.id, role: "Bowler" });
+
+      // Fire-and-forget: sync QR URLs to Google Sheet on every sign-in
+      // (ensures sheet stays current even for bowlers who signed up before sheet integration)
+      const appOrigin = process.env.APP_ORIGIN ?? "https://vegasweeps-y8eywesk.manus.space";
+      getBowlerProfile(bowler.id).then((profile) => {
+        if (!profile) return;
+        writeQRCodesToSheet({
+          firstName: profile.legalFirstName,
+          lastName: profile.legalLastName,
+          laneNumber: profile.laneNumber ?? null,
+          banquetToken: profile.banquetToken ?? null,
+          poolPartyToken: profile.poolPartyToken ?? null,
+          appOrigin,
+        }).catch((err) => console.error("[googleSheets] signIn write-back failed:", err));
+      }).catch(() => {});
+
       return { token, bowlerId: bowler.id, isCapitain: Boolean(bowler.isCapitain) };
     }),
 
@@ -445,6 +462,16 @@ export const bowlerAuthRouter = router({
       if (profile.banquetToken) {
         banquetQR = await QRCode.toDataURL(`${appOrigin}/scan/banquet/${profile.banquetToken}`, { width: 300, margin: 2 });
       }
+
+      // Write QR URLs back to Google Sheet (fire-and-forget, never blocks user)
+      writeQRCodesToSheet({
+        firstName: profile.legalFirstName,
+        lastName: profile.legalLastName,
+        laneNumber: profile.laneNumber ?? null,
+        banquetToken: profile.banquetToken ?? null,
+        poolPartyToken: profile.poolPartyToken ?? null,
+        appOrigin,
+      }).catch((err) => console.error("[googleSheets] write-back failed:", err));
 
       return { ...profile, poolPartyQR, banquetQR };
     }),

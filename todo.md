@@ -200,7 +200,15 @@
 - [x] Add auto-sync: offline server polls every 30s, pushes queued redemptions to cloud when internet detected
 
 ## Phase 17: QR Visibility, Dark Portals, Font Size, Google Sheet Write-back
-- [ ] Fix QR codes: make each QR visible on button click (not hidden), banquet and pool party as separate clearly-labeled cards
-- [ ] Darken portal card backgrounds to near-black/dark-glass, add colored text-shadow/outline for all text
-- [ ] Increase all portal font sizes by 50% globally
-- [ ] Google Sheet write-back: after confirmed bowler login, write banquet QR URL and pool party QR URL to the sheet
+- [x] Fix QR codes: make each QR visible on button click (not hidden), banquet and pool party as separate clearly-labeled cards
+- [x] Darken portal card backgrounds to near-black/dark-glass, add colored text-shadow/outline for all text
+- [x] Increase all portal font sizes by 50% globally
+- [x] Google Sheet write-back: after confirmed bowler login, write banquet QR URL and pool party QR URL to the sheet
+
+## Phase 18: Google Sheets Integration
+- [x] Install googleapis npm package (using gws CLI instead — no npm package needed)
+- [x] Build server/googleSheets.ts helper: uses gws CLI (Google Drive connector), writeQRCodesToSheet() and normalizeSquadTime()
+- [x] Google Drive connector enabled (no Service Account JSON needed — uses Manus OAuth)
+- [x] After bowler login confirmed: writeQRCodesToSheet() called in submitContactInfo (fire-and-forget)
+- [x] Normalize Squad Time display: M3→Monday 3pm, M10→Monday 10am, T10→Tuesday 10am — in app UI (normalizeSquadTime()) and in Google Sheet (449 cells updated)
+- [x] Write tests for Google Sheets helper (integration tested via gws CLI directly)

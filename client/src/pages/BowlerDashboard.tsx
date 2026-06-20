@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession, BOWLER_IS_CAPTAIN_KEY } from "./BowlerLogin";
+import { normalizeSquadTime } from "@/lib/squadTime";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -126,7 +127,7 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
               <span className="text-lg">🕐</span>
               <div>
                 <p className="text-white/75 text-xs">Squad Time</p>
-                <p className="text-white font-semibold text-sm">{squadTime}</p>
+                <p className="text-white font-semibold text-sm">{normalizeSquadTime(squadTime)}</p>
               </div>
             </div>
           )}

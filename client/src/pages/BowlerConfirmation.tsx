@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+import { normalizeSquadTime } from "@/lib/squadTime";
+
 const BOWLER_TOKEN_KEY = "vsn_bowler_token";
 
 function formatId(id: number): string {
@@ -233,7 +235,7 @@ function PassportStep({ profile, onDone }: { profile: any; onDone: () => void })
             {profile.squadTime && (
               <div className="flex justify-between">
                 <span className="text-purple-300">Squad Time</span>
-                <span className="text-white font-medium">{profile.squadTime}</span>
+                <span className="text-white font-medium">{normalizeSquadTime(profile.squadTime)}</span>
               </div>
             )}
             {profile.laneNumber && (

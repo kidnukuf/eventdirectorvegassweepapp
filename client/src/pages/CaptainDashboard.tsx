@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession } from "./BowlerLogin";
+import { normalizeSquadTime } from "@/lib/squadTime";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 function downloadQR(dataUrl: string, filename: string) {
@@ -189,7 +190,7 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
               <span className="text-lg">🕐</span>
               <div>
                 <p className="text-white/50 text-xs">Squad Time</p>
-                <p className="text-white font-semibold text-sm">{squadTime}</p>
+                <p className="text-white font-semibold text-sm">{normalizeSquadTime(squadTime)}</p>
               </div>
             </div>
           )}
@@ -363,7 +364,7 @@ export default function CaptainDashboard() {
               </div>
               <p className="text-white/60 text-sm">{p.teamName ?? "—"} · {p.centerName ?? "—"}</p>
               {p.laneNumber && (
-                <p className="text-amber-300 text-sm mt-1">🎳 Lane {p.laneNumber} · {p.squadTime ?? ""}</p>
+                <p className="text-amber-300 text-sm mt-1">🎳 Lane {p.laneNumber} · {normalizeSquadTime(p.squadTime)}</p>
               )}
             </div>
             <CompletionRing verified={verifiedCount} total={roster.length} />
@@ -510,7 +511,7 @@ export default function CaptainDashboard() {
           <ul className="space-y-2 text-white/60 text-sm">
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Ensure all team members have signed up and are verified before event day</li>
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Confirm hotel reservations and payment status with each member</li>
-            <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Arrive at Lane {p.laneNumber ?? "TBD"} by {p.squadTime ?? "squad time"} on bowling day</li>
+            <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Arrive at Lane {p.laneNumber ?? "TBD"} by {normalizeSquadTime(p.squadTime) || "squad time"} on bowling day</li>
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Contact your Event Director for any roster changes or issues</li>
           </ul>
         </div>
