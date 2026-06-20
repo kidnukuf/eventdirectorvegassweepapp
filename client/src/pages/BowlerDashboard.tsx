@@ -142,12 +142,26 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
           )}
 
           {/* Static entrance flow info */}
-          <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
-            <p className="text-white/70 text-xs leading-relaxed">
-              Lines can be long at event entry. Please plan to arrive at least 30 minutes before your squad time.
-              Have your QR Passport ready on your phone for quick scanning at the door.
-            </p>
+          <div className="mt-3 space-y-2">
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                Lines can be long at event entry. Please plan to arrive at least 30 minutes before your squad time.
+                Have your QR Passport ready on your phone for quick scanning at the door.
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+              <p className="text-cyan-300 text-xs font-semibold mb-1">🎳 Practice Reminder</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                Practice begins <span className="text-white font-semibold">10 minutes before</span> your squad time. Don't be late!
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <p className="text-purple-300 text-xs font-semibold mb-1">🏆 Side Pots &amp; Brackets</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                Side pots and brackets are available at the <span className="text-white font-semibold">front desk</span>. See the desk before your squad begins.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -527,6 +541,7 @@ export default function BowlerDashboard() {
             <p className="text-white/70 text-xs leading-relaxed">
               A doorman will scan your QR code at the entrance. Once scanned, your ticket is marked as used.
               You will receive a wristband for re-entry. Please arrive at least 30 minutes before your squad time — lines can be long.
+              Practice starts <span className="text-amber-300 font-semibold">10 minutes before</span> your squad time. Side pots &amp; brackets are available at the <span className="text-amber-300 font-semibold">front desk</span>.
             </p>
           </div>
         </div>

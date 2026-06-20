@@ -203,12 +203,26 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
               </div>
             </div>
           )}
-          <div className="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
-            <p className="text-white/70 text-xs leading-relaxed">
-              As team captain, please ensure your team arrives at least 30 minutes before squad time.
-              Have all QR Passports ready for quick scanning at the door.
-            </p>
+          <div className="mt-3 space-y-2">
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <p className="text-amber-300 text-xs font-semibold mb-1">⏰ Arrive 30 Minutes Early</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                As team captain, please ensure your team arrives at least 30 minutes before squad time.
+                Have all QR Passports ready for quick scanning at the door.
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+              <p className="text-cyan-300 text-xs font-semibold mb-1">🎳 Practice Reminder</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                Practice begins <span className="text-white font-semibold">10 minutes before</span> squad time. Remind your team not to be late!
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <p className="text-purple-300 text-xs font-semibold mb-1">🏆 Side Pots &amp; Brackets</p>
+              <p className="text-white/70 text-xs leading-relaxed">
+                Side pots and brackets are available at the <span className="text-white font-semibold">front desk</span>. Inform your team to visit the desk before the squad begins.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -512,6 +526,8 @@ export default function CaptainDashboard() {
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Ensure all team members have signed up and are verified before event day</li>
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Confirm hotel reservations and payment status with each member</li>
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Arrive at Lane {p.laneNumber ?? "TBD"} by {normalizeSquadTime(p.squadTime) || "squad time"} on bowling day</li>
+            <li className="flex items-start gap-2"><span className="text-cyan-400 flex-shrink-0">→</span> Practice starts <strong className="text-white">10 minutes before</strong> squad time — ensure your team is on the lanes early</li>
+            <li className="flex items-start gap-2"><span className="text-purple-400 flex-shrink-0">→</span> Side pots &amp; brackets are at the <strong className="text-white">front desk</strong> — see the desk before your squad begins</li>
             <li className="flex items-start gap-2"><span className="text-amber-400 flex-shrink-0">→</span> Contact your Event Director for any roster changes or issues</li>
           </ul>
         </div>
