@@ -276,6 +276,27 @@ function PassportStep({ profile, onDone }: { profile: any; onDone: () => void })
             isUsed={Boolean(profile.banquetUsed)}
             isDisabled={!profile.banquetToken}
           />
+          {/* Guest Pool Party Passes */}
+          {Array.isArray(profile.guestPoolQRs) && profile.guestPoolQRs.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex-1 h-px bg-white/20" />
+                <span className="text-white/50 text-xs font-semibold tracking-widest uppercase">Guest Pool Passes</span>
+                <div className="flex-1 h-px bg-white/20" />
+              </div>
+              {profile.guestPoolQRs.map((g: { suffix: string; qrDataUrl: string; used: boolean; disabled: boolean }) => (
+                <PassportBox
+                  key={g.suffix}
+                  title={`Guest Pool Pass ${g.suffix}`}
+                  icon="🎟️"
+                  color="from-teal-500 to-cyan-600"
+                  qrDataUrl={g.used ? null : g.qrDataUrl}
+                  isUsed={g.used}
+                  isDisabled={g.disabled}
+                />
+              ))}
+            </>
+          )}
         </div>
 
         {/* Go to Dashboard */}

@@ -384,20 +384,48 @@ export const bowlerAuthRouter = router({
 
       const token = signToken({ bowlerId: bowler.id, role: "Bowler" });
 
-      // Fire-and-forget: sync QR URLs to Google Sheet on every sign-in
-      // (ensures sheet stays current even for bowlers who signed up before sheet integration)
+      // Fire-and-forget: ensure guest tokens exist, then sync QR URLs to Google Sheet
       const appOrigin = process.env.APP_ORIGIN ?? "https://vegasweeps-y8eywesk.manus.space";
-      getBowlerProfile(bowler.id).then((profile) => {
-        if (!profile) return;
-        writeQRCodesToSheet({
-          firstName: profile.legalFirstName,
-          lastName: profile.legalLastName,
-          laneNumber: profile.laneNumber ?? null,
-          banquetToken: profile.banquetToken ?? null,
-          poolPartyToken: profile.poolPartyToken ?? null,
-          appOrigin,
-        }).catch((err) => console.error("[googleSheets] signIn write-back failed:", err));
-      }).catch(() => {});
+      (async () => {
+        try {
+          // Generate guest tokens if not yet created
+          const guestAmount = parseFloat(bowler.guestPoolPartyAmount ?? "0") || 0;
+          const guestCount = Math.floor(guestAmount / 15);
+          const SUFFIXES = ["A","B","C","D","E"];
+          if (guestCount > 0) {
+            const existing = await rawQuery<{ count: number }>(
+              `SELECT COUNT(*) as count FROM guest_pool_party_tokens WHERE bowlerId = ?`, [bowler.id]
+            );
+            if ((existing[0]?.count ?? 0) === 0) {
+              for (let i = 0; i < Math.min(guestCount, SUFFIXES.length); i++) {
+                const guestToken = uuidv4().replace(/-/g, "");
+                await rawQuery(
+                  `INSERT INTO guest_pool_party_tokens (bowlerId, suffix, token) VALUES (?, ?, ?)`,
+                  [bowler.id, SUFFIXES[i], guestToken]
+                );
+              }
+            }
+          }
+          // Sync QR URLs to Google Sheet
+          const profile = await getBowlerProfile(bowler.id);
+          if (!profile) return;
+          const guestTokens = await rawQuery<{ suffix: string; token: string; disabled: number }>(
+            `SELECT suffix, token, disabled FROM guest_pool_party_tokens WHERE bowlerId = ? ORDER BY suffix`,
+            [bowler.id]
+          );
+          await writeQRCodesToSheet({
+            firstName: profile.legalFirstName,
+            lastName: profile.legalLastName,
+            laneNumber: profile.laneNumber ?? null,
+            banquetToken: profile.banquetToken ?? null,
+            poolPartyToken: profile.poolPartyToken ?? null,
+            guestPoolTokens: guestTokens.filter(g => !g.disabled).map(g => ({ suffix: g.suffix, token: g.token })),
+            appOrigin,
+          });
+        } catch (err) {
+          console.error("[googleSheets] signIn write-back failed:", err);
+        }
+      })();
 
       return { token, bowlerId: bowler.id, isCapitain: Boolean(bowler.isCapitain) };
     }),
@@ -492,6 +520,28 @@ export const bowlerAuthRouter = router({
       }
       if (profile.banquetToken) {
         banquetQR = await QRCode.toDataURL(`${appOrigin}/scan/banquet/${profile.banquetToken}`, { width: 300, margin: 2 });
+      }
+
+      // Generate guest pool party tokens if not yet created (idempotent)
+      const bowlerForGuest = await rawQuery<{ guestPoolPartyAmount: string | null }>(
+        `SELECT guestPoolPartyAmount FROM bowlers WHERE id = ? LIMIT 1`, [bowlerId]
+      );
+      const guestAmountSCI = parseFloat(bowlerForGuest[0]?.guestPoolPartyAmount ?? "0") || 0;
+      const guestCountSCI = Math.floor(guestAmountSCI / 15);
+      const SUFFIXES_SCI = ["A","B","C","D","E"];
+      if (guestCountSCI > 0) {
+        const existingGuest = await rawQuery<{ count: number }>(
+          `SELECT COUNT(*) as count FROM guest_pool_party_tokens WHERE bowlerId = ?`, [bowlerId]
+        );
+        if ((existingGuest[0]?.count ?? 0) === 0) {
+          for (let i = 0; i < Math.min(guestCountSCI, SUFFIXES_SCI.length); i++) {
+            const guestToken = uuidv4().replace(/-/g, "");
+            await rawQuery(
+              `INSERT INTO guest_pool_party_tokens (bowlerId, suffix, token) VALUES (?, ?, ?)`,
+              [bowlerId, SUFFIXES_SCI[i], guestToken]
+            );
+          }
+        }
       }
 
       // Fetch guest pool tokens for this bowler
@@ -644,11 +694,31 @@ export const bowlerAuthRouter = router({
          ORDER BY b.legalLastName, b.legalFirstName`,
         [input.eventId]
       );
+      // Fetch guest pool tokens for all bowlers in one query
+      const bowlerIds = rows.map(r => r.id);
+      const guestTokenMap: Record<number, Array<{ suffix: string; token: string; used: number; disabled: number }>> = {};
+      if (bowlerIds.length > 0) {
+        const placeholders = bowlerIds.map(() => "?").join(",");
+        const guestRows = await rawQuery<{ bowlerId: number; suffix: string; token: string; used: number; disabled: number }>(
+          `SELECT bowlerId, suffix, token, used, disabled FROM guest_pool_party_tokens WHERE bowlerId IN (${placeholders}) ORDER BY suffix`,
+          bowlerIds
+        );
+        for (const gr of guestRows) {
+          if (!guestTokenMap[gr.bowlerId]) guestTokenMap[gr.bowlerId] = [];
+          guestTokenMap[gr.bowlerId].push(gr);
+        }
+      }
       const appOrigin = process.env.APP_ORIGIN ?? "https://vegasweeps-y8eywesk.manus.space";
       return rows.map(r => ({
         ...r,
         poolPartyUrl: r.poolPartyToken ? `${appOrigin}/scan/pool/${r.poolPartyToken}` : null,
         banquetUrl: r.banquetToken ? `${appOrigin}/scan/banquet/${r.banquetToken}` : null,
+        guestPoolTokens: (guestTokenMap[r.id] ?? []).map(g => ({
+          suffix: g.suffix,
+          url: `${appOrigin}/scan/guest-pool/${g.token}`,
+          used: Boolean(g.used),
+          disabled: Boolean(g.disabled),
+        })),
       }));
     }),
 

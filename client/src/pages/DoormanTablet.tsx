@@ -117,7 +117,7 @@ function ConfettiBurst({ active }: { active: boolean }) {
   );
 }
 
-type PassportMode = "pool" | "banquet";
+type PassportMode = "pool" | "banquet" | "guest-pool";
 type ScanResult = "granted" | "used" | "disabled" | "invalid" | null;
 type TabletTab = "passport" | "checkin";
 
@@ -368,7 +368,7 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
   }
 
   function handlePassportScan(decodedText: string) {
-    const match = decodedText.match(/\/scan\/(pool|banquet)\/([a-f0-9-]+)/i);
+    const match = decodedText.match(/\/scan\/(pool|banquet|guest-pool)\/([a-f0-9-]+)/i);
     if (match) {
       passportScan.mutate({ tokenValue: match[2], passportType: match[1] as PassportMode });
     } else {
@@ -527,7 +527,7 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
           {!scanResult && (
             <>
               {/* Mode selector */}
-              <div className="bg-[#1a1a1a] rounded-2xl p-1 flex gap-1 border border-white/10">
+              <div className="bg-[#1a1a1a] rounded-2xl p-1 flex gap-1 border border-white/10 flex-wrap">
                 <button onClick={() => setPassportMode("pool")}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}>
                   🏊 Pool Party
@@ -535,6 +535,10 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
                 <button onClick={() => setPassportMode("banquet")}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${passportMode === "banquet" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}>
                   🍽️ Banquet Dinner
+                </button>
+                <button onClick={() => setPassportMode("guest-pool")}
+                  className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${passportMode === "guest-pool" ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}>
+                  🎟️ Guest Pool
                 </button>
               </div>
 
@@ -552,7 +556,7 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
                     <div className="text-6xl mb-4">📷</div>
                     <p className="text-gray-500 text-sm mb-4">Tap to activate camera and scan a bowler's passport QR code.</p>
                     <button onClick={() => setScanning(true)}
-                      className={`w-full py-4 font-black text-lg rounded-xl text-white transition-all active:scale-95 ${passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600" : "bg-gradient-to-r from-purple-500 to-pink-600"}`}>
+                      className={`w-full py-4 font-black text-lg rounded-xl text-white transition-all active:scale-95 ${passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600" : passportMode === "guest-pool" ? "bg-gradient-to-r from-teal-500 to-cyan-600" : "bg-gradient-to-r from-purple-500 to-pink-600"}`}>
                       📷 Start Camera Scan
                     </button>
                   </div>
@@ -562,7 +566,7 @@ function TabletScanner({ onLock }: { onLock: () => void }) {
               {/* Manual entry */}
               <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 p-4">
                 <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-3">Manual Entry</p>
-                <form onSubmit={(e) => { e.preventDefault(); if (!manualToken.trim()) return; const m = manualToken.trim().match(/\/scan\/(pool|banquet)\/([a-f0-9-]+)/i); if (m) { passportScan.mutate({ tokenValue: m[2], passportType: m[1] as PassportMode }); } else { passportScan.mutate({ tokenValue: manualToken.trim(), passportType: passportMode }); } setManualToken(""); }} className="flex gap-2">
+                <form onSubmit={(e) => { e.preventDefault(); if (!manualToken.trim()) return; const m = manualToken.trim().match(/\/scan\/(pool|banquet|guest-pool)\/([a-f0-9-]+)/i); if (m) { passportScan.mutate({ tokenValue: m[2], passportType: m[1] as PassportMode }); } else { passportScan.mutate({ tokenValue: manualToken.trim(), passportType: passportMode }); } setManualToken(""); }} className="flex gap-2">
                   <input type="text" placeholder="Paste QR URL or token..." value={manualToken} onChange={(e) => setManualToken(e.target.value)}
                     className="flex-1 px-3 py-2.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500 font-mono" />
                   <button type="submit" disabled={passportScan.isPending || !manualToken.trim()}

@@ -223,6 +223,7 @@ function PassportManager({
                 <th className="px-4 py-3 text-left">Center</th>
                 <th className="px-4 py-3 text-center">🏊 Pool Party</th>
                 <th className="px-4 py-3 text-center">🍽️ Banquet</th>
+                <th className="px-4 py-3 text-center">🎟️ Guest Pool</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -252,7 +253,21 @@ function PassportManager({
                       {!hasTokens ? <span className="text-gray-600 text-xs">No account</span> :
                         banquetUsed ? <span className="text-green-400 text-xs font-bold">✅ Redeemed</span> :
                         banquetDisabled ? <span className="text-orange-400 text-xs font-bold">⛔ Disabled</span> :
-                        <span className="text-purple-400 text-xs font-bold">🎫 Active</span>}
+                        <span className="text-purple-400 text-xs font-bold">🎟️ Active</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {!hasTokens ? <span className="text-gray-600 text-xs">—</span> :
+                        !(b as any).guestPoolTokens?.length ? <span className="text-gray-600 text-xs">None</span> :
+                        <div className="flex flex-col gap-1 items-center">
+                          {((b as any).guestPoolTokens as Array<{ suffix: string; used: boolean; disabled: boolean }>).map((g) => (
+                            <span key={g.suffix} className={`text-xs font-bold px-2 py-0.5 rounded ${
+                              g.used ? "text-green-400" : g.disabled ? "text-orange-400" : "text-teal-400"
+                            }`}>
+                              Pass {g.suffix}: {g.used ? "✅ Used" : g.disabled ? "⛔ Off" : "🎟️ Active"}
+                            </span>
+                          ))}
+                        </div>
+                      }
                     </td>
                     <td className="px-4 py-3">
                       {hasTokens && (

@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 type DoormanTab = "checkin" | "passport";
-type PassportMode = "pool" | "banquet";
+type PassportMode = "pool" | "banquet" | "guest-pool";
 type PassportScanResult = "granted" | "used" | "disabled" | "invalid" | null;
 
 type BowlerResult = Record<string, unknown>;
@@ -81,7 +81,7 @@ export default function DoormanCheckIn() {
   }
 
   function handlePassportScanSuccess(decodedText: string) {
-    const match = decodedText.match(/\/scan\/(pool|banquet)\/([a-f0-9]+)/i);
+    const match = decodedText.match(/\/scan\/(pool|banquet|guest-pool)\/([a-f0-9]+)/i);
     if (match) {
       passportScanMutation.mutate({ tokenValue: match[2], passportType: match[1] as PassportMode });
     } else {
@@ -92,7 +92,7 @@ export default function DoormanCheckIn() {
   function handlePassportManualSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!passportManualToken.trim()) return;
-    const match = passportManualToken.trim().match(/\/scan\/(pool|banquet)\/([a-f0-9]+)/i);
+    const match = passportManualToken.trim().match(/\/scan\/(pool|banquet|guest-pool)\/([a-f0-9]+)/i);
     if (match) {
       passportScanMutation.mutate({ tokenValue: match[2], passportType: match[1] as PassportMode });
     } else {
@@ -349,7 +349,7 @@ export default function DoormanCheckIn() {
           {!passportScanResult && (
             <>
               {/* Mode selector */}
-              <div className="bg-[#1a1a1a] rounded-2xl p-1 flex gap-1 border border-white/10">
+              <div className="bg-[#1a1a1a] rounded-2xl p-1 flex gap-1 border border-white/10 flex-wrap">
                 <button onClick={() => setPassportMode("pool")}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
                     passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg" : "text-gray-400 hover:text-white"
@@ -361,6 +361,12 @@ export default function DoormanCheckIn() {
                     passportMode === "banquet" ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg" : "text-gray-400 hover:text-white"
                   }`}>
                   🍽️ Banquet Dinner
+                </button>
+                <button onClick={() => setPassportMode("guest-pool")}
+                  className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
+                    passportMode === "guest-pool" ? "bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg" : "text-gray-400 hover:text-white"
+                  }`}>
+                  🎟️ Guest Pool
                 </button>
               </div>
 
@@ -382,7 +388,9 @@ export default function DoormanCheckIn() {
                     <p className="text-gray-500 text-sm mb-4">Tap to activate camera and scan a bowler's passport QR code.</p>
                     <button onClick={() => setPassportScanning(true)}
                       className={`w-full py-4 font-black text-lg rounded-xl text-white ${
-                        passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600" : "bg-gradient-to-r from-purple-500 to-pink-600"
+                        passportMode === "pool" ? "bg-gradient-to-r from-cyan-500 to-blue-600" :
+                        passportMode === "guest-pool" ? "bg-gradient-to-r from-teal-500 to-cyan-600" :
+                        "bg-gradient-to-r from-purple-500 to-pink-600"
                       }`}>
                       Start Camera Scan
                     </button>
