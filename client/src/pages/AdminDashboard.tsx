@@ -152,6 +152,14 @@ function PassportManager({
     onSuccess: () => { toast.success("Passport re-enabled"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const disableGuestPass = trpc.bowlerAuth.disableGuestPass.useMutation({
+    onSuccess: () => { toast.success("Guest pass disabled"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const enableGuestPass = trpc.bowlerAuth.enableGuestPass.useMutation({
+    onSuccess: () => { toast.success("Guest pass re-enabled"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   // Only show signed-up bowlers (those who have tokens)
   const signedUp = bowlers.filter((b) => b.poolPartyToken !== undefined || b.banquetToken !== undefined ||
@@ -260,11 +268,24 @@ function PassportManager({
                         !(b as any).guestPoolTokens?.length ? <span className="text-gray-600 text-xs">None</span> :
                         <div className="flex flex-col gap-1 items-center">
                           {((b as any).guestPoolTokens as Array<{ suffix: string; used: boolean; disabled: boolean }>).map((g) => (
-                            <span key={g.suffix} className={`text-xs font-bold px-2 py-0.5 rounded ${
-                              g.used ? "text-green-400" : g.disabled ? "text-orange-400" : "text-teal-400"
-                            }`}>
-                              Pass {g.suffix}: {g.used ? "✅ Used" : g.disabled ? "⛔ Off" : "🎟️ Active"}
-                            </span>
+                            <div key={g.suffix} className="flex items-center gap-1.5">
+                              <span className={`text-xs font-bold ${
+                                g.used ? "text-green-400" : g.disabled ? "text-orange-400" : "text-teal-400"
+                              }`}>
+                                {g.used ? "✅" : g.disabled ? "⛔" : "🎟️"} Pass {g.suffix}
+                              </span>
+                              {!g.used && (
+                                <button
+                                  onClick={() => g.disabled
+                                    ? enableGuestPass.mutate({ token: edToken, bowlerId, suffix: g.suffix })
+                                    : disableGuestPass.mutate({ token: edToken, bowlerId, suffix: g.suffix })}
+                                  className={`px-1.5 py-0.5 rounded text-xs font-bold transition-colors ${
+                                    g.disabled ? "bg-teal-700 hover:bg-teal-600 text-white" : "bg-orange-700 hover:bg-orange-600 text-white"
+                                  }`}>
+                                  {g.disabled ? "Enable" : "Disable"}
+                                </button>
+                              )}
+                            </div>
                           ))}
                         </div>
                       }

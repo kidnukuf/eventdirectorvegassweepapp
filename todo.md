@@ -228,3 +228,11 @@
 - [x] Add guest pool party token scanning to Doorman portal (scanPassport handles guestPoolParty type)
 - [x] Add guest pool party tokens to Event Director Passport Management tab
 - [x] Run tests and save checkpoint
+
+## Phase 20: Roster Re-import & Guest Pass Controls
+
+- [x] Verify import parser maps column U (Guest Pool Party $) to guestPoolPartyAmount correctly
+- [x] Trigger re-import from the updated Google Sheet via the Event Director import panel (26 bowlers updated directly via SQL)
+- [x] Add disableGuestPass and enableGuestPass tRPC procedures on the server
+- [x] Add disable/enable buttons for each guest pool pass in the ED Passport Management table
+- [x] Test and save checkpoint

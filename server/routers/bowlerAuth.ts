@@ -670,6 +670,35 @@ export const bowlerAuthRouter = router({
       return { success: true };
     }),
 
+  // ── DISABLE / ENABLE INDIVIDUAL GUEST POOL PASS ──────────────────────────────
+  disableGuestPass: publicProcedure
+    .input(z.object({ token: z.string(), bowlerId: z.number(), suffix: z.string() }))
+    .mutation(async ({ input }) => {
+      const payload = verifyToken(input.token);
+      if (!payload || payload.role !== "EventDirector") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Event Director access required." });
+      }
+      await rawQuery(
+        `UPDATE guest_pool_party_tokens SET disabled = 1 WHERE bowlerId = ? AND suffix = ?`,
+        [input.bowlerId, input.suffix]
+      );
+      return { success: true };
+    }),
+
+  enableGuestPass: publicProcedure
+    .input(z.object({ token: z.string(), bowlerId: z.number(), suffix: z.string() }))
+    .mutation(async ({ input }) => {
+      const payload = verifyToken(input.token);
+      if (!payload || payload.role !== "EventDirector") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Event Director access required." });
+      }
+      await rawQuery(
+        `UPDATE guest_pool_party_tokens SET disabled = 0 WHERE bowlerId = ? AND suffix = ?`,
+        [input.bowlerId, input.suffix]
+      );
+      return { success: true };
+    }),
+
   // ── GET PASSPORT STATUS (Event Director list) ────────────────────────────────
   getPassportStatus: publicProcedure
     .input(z.object({ token: z.string(), eventId: z.number() }))
