@@ -48,7 +48,14 @@ function EdLoginGate({ onAuth }: { onAuth: () => void }) {
 
         {/* Icon */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🎯</div>
+          <div className="flex justify-center mb-3">
+            <img
+              src="https://d2xsxph8kpxj0f.cloudfront.net/118351434/Y8eYwESKJRiDArjEnFPr6k/ed-icon-512-Vu5wULChGrkz9WqWNQ6rBh.png"
+              alt="ED Portal"
+              className="w-20 h-20 rounded-2xl shadow-2xl"
+              style={{ filter: "drop-shadow(0 0 16px rgba(255,215,0,0.6))" }}
+            />
+          </div>
           <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
             EVENT DIRECTOR
           </h1>
