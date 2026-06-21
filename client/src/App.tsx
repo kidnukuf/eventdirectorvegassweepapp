@@ -25,6 +25,77 @@ import ScanPassport from "./pages/ScanPassport";
 import DoormanTablet from "./pages/DoormanTablet";
 import LeagueSelector from "./pages/LeagueSelector";
 import { VideoSplash } from "./components/VideoSplash";
+import { useLocation } from "wouter";
+
+const ED_ICON_URL = "https://d2xsxph8kpxj0f.cloudfront.net/118351434/Y8eYwESKJRiDArjEnFPr6k/ed-icon-512-Vu5wULChGrkz9WqWNQ6rBh.png";
+
+/** Injects the ED-specific icon + manifest when the user is on the /ed route.
+ *  This makes "Add to Home Screen" on Android save the gold ED icon. */
+function EdIconInjector() {
+  const [location] = useLocation();
+  const isEdRoute = location === "/ed" || location.startsWith("/ed/");
+
+  useEffect(() => {
+    if (!isEdRoute) return;
+
+    // --- favicon ---
+    let favicon = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      document.head.appendChild(favicon);
+    }
+    const prevFavicon = favicon.href;
+    favicon.href = ED_ICON_URL;
+
+    // --- apple-touch-icon ---
+    let appleIcon = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (!appleIcon) {
+      appleIcon = document.createElement("link");
+      appleIcon.rel = "apple-touch-icon";
+      document.head.appendChild(appleIcon);
+    }
+    const prevApple = appleIcon.href;
+    appleIcon.href = ED_ICON_URL;
+
+    // --- manifest override ---
+    const manifestEl = document.querySelector<HTMLLinkElement>("link[rel='manifest']");
+    let prevManifest = "";
+    let blobUrl = "";
+    if (manifestEl) {
+      prevManifest = manifestEl.href;
+      const manifestData = {
+        name: "ED Portal — Event Director",
+        short_name: "ED Portal",
+        icons: [
+          { src: ED_ICON_URL, sizes: "512x512", type: "image/png" },
+        ],
+        theme_color: "#ffd700",
+        background_color: "#0d0d1a",
+        display: "standalone",
+        start_url: "/ed",
+      };
+      const blob = new Blob([JSON.stringify(manifestData)], { type: "application/json" });
+      blobUrl = URL.createObjectURL(blob);
+      manifestEl.href = blobUrl;
+    }
+
+    // --- page title ---
+    const prevTitle = document.title;
+    document.title = "ED Portal — Event Director";
+
+    return () => {
+      // Restore when navigating away
+      if (favicon) favicon.href = prevFavicon;
+      if (appleIcon) appleIcon.href = prevApple;
+      if (manifestEl && prevManifest) manifestEl.href = prevManifest;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      document.title = prevTitle;
+    };
+  }, [isEdRoute]);
+
+  return null;
+}
 
 function Router() {
   return (
@@ -113,6 +184,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <PwaIconInjector />
+          <EdIconInjector />
           <VideoSplash />
           <OfflineBanner />
           <Toaster />
