@@ -732,14 +732,26 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Events dropdown — uses Radix portal for viewport-safe positioning */}
+            {/* Events dropdown — centered in viewport */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-semibold transition-colors">🗓️ Events ▾</button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                align="end"
-                className="bg-[#1a1a1a] border-yellow-500/30 text-white w-[min(320px,calc(100vw-1rem))] max-h-[70vh] overflow-y-auto"
+                align="center"
+                side="bottom"
+                avoidCollisions={false}
+                style={{
+                  position: "fixed",
+                  left: "50%",
+                  top: "60px",
+                  transform: "translateX(-50%)",
+                  width: "min(340px, calc(100vw - 1rem))",
+                  maxHeight: "70vh",
+                  overflowY: "auto",
+                  zIndex: 9999,
+                }}
+                className="bg-[#1a1a1a] border border-yellow-500/30 text-white rounded-xl shadow-2xl"
               >
                 <DropdownMenuLabel className="text-gray-500 text-[10px] uppercase tracking-wider">Switch active event</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/10" />
