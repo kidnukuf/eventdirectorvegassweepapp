@@ -205,6 +205,7 @@ export const hotelRecords = mysqlTable("hotel_records", {
   bowlerId: int("bowlerId").notNull(),
   hotelName: varchar("hotelName", { length: 255 }),
   reservationId: varchar("reservationId", { length: 100 }),
+  confirmationCode: varchar("confirmationCode", { length: 100 }),
   checkinDate: varchar("checkinDate", { length: 20 }),
   checkoutDate: varchar("checkoutDate", { length: 20 }),
   roomType: varchar("roomType", { length: 20 }), // 1K, 2D, etc.

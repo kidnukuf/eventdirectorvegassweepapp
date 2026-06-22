@@ -800,26 +800,77 @@ export const appRouter = router({
               [scantronId, input.eventId]
             ) as Record<string, unknown>[];
 
-            // Parse hotel/payment data — 22-column B.O.B. layout (Jun 17 v2)
+            // ── Hotel / room data ─────────────────────────────────────────────────────
+            // Col M: Hotel Confirmation # (confirmation code from hotel)
+            const hotelConfirmation = String(
+              row["Hotel Confirmation #"] ?? row["Hotel Confirmation"] ?? row["Confirmation #"] ??
+              row["Confirmation"] ?? row["hotel_confirmation"] ?? row["hotelConfirmation"] ?? ""
+            ).trim();
+            // Col N / O: Check-in / Check-out dates
             const checkinDate = String(row["Check In"] ?? row["Check-In Date"] ?? row["checkin_date"] ?? "").trim();
             const checkoutDate = String(row["Check Out"] ?? row["Check-Out Date"] ?? row["checkout_date"] ?? "").trim();
-            // Room Type removed from sheet — keep fallback for legacy imports
+            // Room Type — legacy fallback only (removed from current sheet)
             const roomType = String(row["Room Type"] ?? row["room_type"] ?? "").trim();
             const roommateFirst = String(row["Roommate First Name"] ?? row["Roommate First"] ?? row["roommate_first"] ?? "").trim();
             const roommateLast = String(row["Roommate Last Name"] ?? row["Roommate Last"] ?? row["roommate_last"] ?? "").trim();
-            // roommateRequested: infer from roommate name being present
             const roommateRequested = !!(roommateFirst || roommateLast);
             const roomAmount = parseFloat(String(row["Amount Due"] ?? row["Room Amount Due"] ?? row["Room Amount"] ?? row["room_amount"] ?? "0").replace(/[$,]/g, "")) || 0;
-            // Column W: Banquet table assignment (e.g. "Choose a seat at Tables 1, 2, 3, or 4") — set per bowler
-            const banquetTable = String(row["Assigned Table #"] ?? row["Assigned Table"] ?? row["banquet_table"] ?? row["Banquet Table"] ?? row["Table #"] ?? "").trim() || undefined;
-            // Column X: extra banquet (was previously in a different position)
-            const banquetRaw = String(row["extra banquet"] ?? row["Extra Banquet"] ?? row["Banquet $80"] ?? row["Banquet"] ?? row["banquet"] ?? "0").trim();
-            const extraBanquet = parseFloat(banquetRaw.replace(/[$,]/g, "")) || 0;
-            // Column Y: extra pool party (was previously in a different position)
-            const poolPartyRaw = String(row["extra pool party"] ?? row["Extra Pool Party"] ?? row["Guest Pool Party"] ?? row["Guest $15"] ?? row["Pool Party"] ?? "0").replace(/[$,]/g, "").trim();
-            const guestPoolPartyRaw = poolPartyRaw;
-            const guestPoolPartyAmount = parseFloat(guestPoolPartyRaw) || 0;
-            const poolParty = guestPoolPartyAmount > 0 || ["y", "yes", "true", "1", "x"].includes(guestPoolPartyRaw.toLowerCase()) || (poolPartyRaw.includes("PM") || poolPartyRaw.includes("AM"));
+
+            // ── Banquet table assignment (Col W) ──────────────────────────────────────
+            // Accepts: "Assigned Table #", "Assigned Table", "Table #", "Table", "banquet_table", "Banquet Table"
+            const banquetTable = String(
+              row["Assigned Table #"] ?? row["Assigned Table"] ?? row["Table #"] ??
+              row["Table"] ?? row["banquet_table"] ?? row["Banquet Table"] ?? ""
+            ).trim() || undefined;
+
+            // ── Extra banquet tickets (Col S / X) ────────────────────────────────────
+            // Accepts numeric count, dollar amount, or Y/N
+            const banquetRaw = String(
+              row["Extra Banquet"] ?? row["extra banquet"] ?? row["Banquet $80"] ??
+              row["Banquet"] ?? row["banquet"] ?? row["extra_banquet"] ?? "0"
+            ).trim();
+            const extraBanquet = ["y", "yes", "true", "x"].includes(banquetRaw.toLowerCase())
+              ? 1
+              : (parseFloat(banquetRaw.replace(/[$,]/g, "")) || 0);
+
+            // ── Pool party / extra guest fee (Col Q / R / U / Y) ─────────────────────
+            // Col Q: main pool party flag (Y/N)
+            // Col R: extra guest tickets (numeric, dollar, or Y/N)
+            // Col U: extra pool party $ amount (dollar amount)
+            // Parser merges all into: poolParty (boolean) + guestPoolPartyAmount (number)
+            //
+            // Accepted values for pool party flag: Y, Yes, True, 1, X, any number > 0,
+            //   any dollar amount > 0, "Pool Party check in...", time strings (7pm, 7:00 PM)
+            const poolPartyFlagRaw = String(
+              row["Pool Party"] ?? row["pool_party"] ?? row["pool party"] ?? ""
+            ).trim();
+            const extraPoolPartyRaw = String(
+              row["Extra Pool Party"] ?? row["extra pool party"] ?? row["Guest Pool Party"] ??
+              row["Guest $15"] ?? row["extra_pool_party"] ?? ""
+            ).trim();
+            const extraPoolPartyDollarRaw = String(
+              row["Extra Pool Party $"] ?? row["Extra Pool Party $"] ?? row["pool_party_amount"] ?? ""
+            ).trim();
+
+            // Resolve pool party attendance: true if flag is Y/yes/true/1/x, or any positive numeric/dollar value
+            const isYesLike = (v: string) =>
+              ["y", "yes", "true", "1", "x"].includes(v.toLowerCase()) ||
+              /\d/.test(v) && parseFloat(v.replace(/[$,]/g, "")) > 0 ||
+              /pool party/i.test(v) ||
+              /\d+(am|pm|:\d{2})/i.test(v);
+
+            const poolParty = isYesLike(poolPartyFlagRaw) || isYesLike(extraPoolPartyRaw) || isYesLike(extraPoolPartyDollarRaw);
+
+            // Resolve guest count / dollar amount for extra pool party guests
+            const resolveGuestAmount = (v: string): number => {
+              const lower = v.toLowerCase();
+              if (["y", "yes", "true", "x"].includes(lower)) return 0; // attending but no extra guests
+              return parseFloat(v.replace(/[$,]/g, "")) || 0;
+            };
+            const guestPoolPartyAmount =
+              resolveGuestAmount(extraPoolPartyDollarRaw) ||
+              resolveGuestAmount(extraPoolPartyRaw) ||
+              0;
             const extraGuestFee = guestPoolPartyAmount;
             const totalAmountDue = parseFloat(String(row["Total Due"] ?? row["Total Amount"] ?? row["total"] ?? "0").replace(/[$,]/g, "")) || 0;
             const notes = String(row["Special Notes"] ?? row["notes"] ?? "").trim();
@@ -857,8 +908,8 @@ export const appRouter = router({
                 guestPoolPartyAmount: guestPoolPartyAmount.toFixed(2),
                 banquetTable: banquetTable || undefined,
               });
-              if (checkinDate || checkoutDate || roomType) {
-                await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
+              if (checkinDate || checkoutDate || roomType || hotelConfirmation) {
+                await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount, confirmationCode: hotelConfirmation || undefined });
               }
               const effectiveBanquet = extraBanquet;
               const effectivePoolParty = poolParty;
@@ -882,8 +933,8 @@ export const appRouter = router({
               const newBowler = await rawQuery("SELECT id FROM bowlers WHERE scantronId = ? LIMIT 1", [scantronId]) as Record<string, unknown>[];
               const bowlerId = newBowler[0]?.id as number;
               if (bowlerId) {
-                if (checkinDate || checkoutDate || roomType) {
-                  await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
+                if (checkinDate || checkoutDate || roomType || hotelConfirmation) {
+                  await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount, confirmationCode: hotelConfirmation || undefined });
                 }
                 const effectiveBanquet2 = extraBanquet;
                 const effectivePoolParty2 = poolParty;
