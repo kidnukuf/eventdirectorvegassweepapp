@@ -154,6 +154,30 @@ export const appRouter = router({
         });
         return { success: true, id };
       }),
+    // Update banquet info for an event (location + time apply to ALL bowlers in that event)
+    updateBanquetInfo: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        banquetLocation: z.string().optional(),
+        banquetTime: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await rawQuery(
+          `UPDATE events SET banquetLocation=?, banquetTime=? WHERE id=?`,
+          [input.banquetLocation ?? null, input.banquetTime ?? null, input.id]
+        );
+        return { success: true };
+      }),
+    // Get banquet info for an event
+    getBanquetInfo: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const rows = await rawQuery(
+          `SELECT banquetLocation, banquetTime FROM events WHERE id=?`,
+          [input.id]
+        ) as Record<string, unknown>[];
+        return { banquetLocation: rows[0]?.banquetLocation ?? null, banquetTime: rows[0]?.banquetTime ?? null };
+      }),
   }),
 
   // ─── BOWLERS ──────────────────────────────────────────────────────────────
@@ -786,11 +810,13 @@ export const appRouter = router({
             // roommateRequested: infer from roommate name being present
             const roommateRequested = !!(roommateFirst || roommateLast);
             const roomAmount = parseFloat(String(row["Amount Due"] ?? row["Room Amount Due"] ?? row["Room Amount"] ?? row["room_amount"] ?? "0").replace(/[$,]/g, "")) || 0;
-            // Banquet: accept "Banquet" column (time string like "6:00 PM") or legacy numeric extra banquet
+            // Column W: Banquet table assignment (e.g. "Choose a seat at Tables 1, 2, 3, or 4") — set per bowler
+            const banquetTable = String(row["Assigned Table #"] ?? row["Assigned Table"] ?? row["banquet_table"] ?? row["Banquet Table"] ?? row["Table #"] ?? "").trim() || undefined;
+            // Column X: extra banquet (was previously in a different position)
             const banquetRaw = String(row["extra banquet"] ?? row["Extra Banquet"] ?? row["Banquet $80"] ?? row["Banquet"] ?? row["banquet"] ?? "0").trim();
             const extraBanquet = parseFloat(banquetRaw.replace(/[$,]/g, "")) || 0;
-            // Pool party: accept "Pool Party" column (time string) or legacy numeric
-            const poolPartyRaw = String(row["Guest Pool Party"] ?? row["Guest $15"] ?? row["extra pool party"] ?? row["Extra Pool Party"] ?? row["Pool Party"] ?? "0").replace(/[$,]/g, "").trim();
+            // Column Y: extra pool party (was previously in a different position)
+            const poolPartyRaw = String(row["extra pool party"] ?? row["Extra Pool Party"] ?? row["Guest Pool Party"] ?? row["Guest $15"] ?? row["Pool Party"] ?? "0").replace(/[$,]/g, "").trim();
             const guestPoolPartyRaw = poolPartyRaw;
             const guestPoolPartyAmount = parseFloat(guestPoolPartyRaw) || 0;
             const poolParty = guestPoolPartyAmount > 0 || ["y", "yes", "true", "1", "x"].includes(guestPoolPartyRaw.toLowerCase()) || (poolPartyRaw.includes("PM") || poolPartyRaw.includes("AM"));
@@ -829,6 +855,7 @@ export const appRouter = router({
                 sanctionNumber, gamesPlayed, bestAverage, tshirtSize,
                 under21, leagueMember, squadTime: squadTimeVal, laneNumber, laneToEvent,
                 guestPoolPartyAmount: guestPoolPartyAmount.toFixed(2),
+                banquetTable: banquetTable || undefined,
               });
               if (checkinDate || checkoutDate || roomType) {
                 await upsertHotelRecord(bowlerId, { checkinDate, checkoutDate, roomType, roommateRequested, roommateFirstName: roommateFirst, roommateLastName: roommateLast, roomAmount });
@@ -844,13 +871,13 @@ export const appRouter = router({
               // Insert new bowler
               await rawQuery(
                 `INSERT INTO bowlers (eventId, leagueId, teamId, centerId, scantronId, bowlerPosition, legalFirstName, legalLastName, isCapitain, phone, email, notes, registrationStatus,
-                   sanctionNumber, gamesPlayed, bestAverage, tshirtSize, under21, leagueMember, squadTime, laneNumber, laneToEvent, guestPoolPartyAmount)
-                 VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pre_registered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   sanctionNumber, gamesPlayed, bestAverage, tshirtSize, under21, leagueMember, squadTime, laneNumber, laneToEvent, guestPoolPartyAmount, banquetTable)
+                 VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pre_registered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [input.eventId, teamId, center.id, scantronId, bb, firstName, lastName, isCapt ? 1 : 0,
                  phone || null, email || null, notes || null,
                  sanctionNumber || null, gamesPlayed ?? null, bestAverage ?? null, tshirtSize || null,
                  under21 ? 1 : 0, leagueMember ? 1 : 0, squadTimeVal || null, laneNumber ?? null, laneToEvent || null,
-                 guestPoolPartyAmount.toFixed(2)]
+                 guestPoolPartyAmount.toFixed(2), banquetTable || null]
               );
               const newBowler = await rawQuery("SELECT id FROM bowlers WHERE scantronId = ? LIMIT 1", [scantronId]) as Record<string, unknown>[];
               const bowlerId = newBowler[0]?.id as number;

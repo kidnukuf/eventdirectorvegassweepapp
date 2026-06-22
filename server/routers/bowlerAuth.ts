@@ -14,7 +14,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { rawQuery } from "../db";
 import { notifyOwner } from "../_core/notification";
-import { writeQRCodesToSheet } from "../googleSheets";
+import { writeQRCodesToSheet, writeContactInfoToSheet } from "../googleSheets";
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 const TOKEN_TTL = "30d";
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY ?? "";
@@ -151,6 +151,7 @@ async function getBowlerProfile(bowlerId: number) {
     banquetToken: string | null;
     banquetUsed: number;
     guestPoolPartyAmount: string | null;
+    eventId: number | null;
   }>(
     `SELECT b.id, b.legalFirstName, b.legalLastName, b.preferredName,
             b.email, b.phone, b.scantronId, b.registrationStatus,
@@ -161,7 +162,7 @@ async function getBowlerProfile(bowlerId: number) {
             h.hotelName, h.checkinDate, h.checkoutDate, h.roomType,
             p.totalAmountDue, p.paid,
             b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed,
-            b.guestPoolPartyAmount
+            b.guestPoolPartyAmount, b.eventId
      FROM bowlers b
      LEFT JOIN teams t ON t.id = b.teamId
      LEFT JOIN bowling_centers bc ON bc.id = b.centerId
@@ -749,6 +750,103 @@ export const bowlerAuthRouter = router({
           disabled: Boolean(g.disabled),
         })),
       }));
+    }),
+
+  // ── SUBMIT CONTACT REQUEST (bowler submits phone + email when info is missing) ──
+  submitContactRequest: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      phone: z.string().regex(/^\d{10}$/, "Phone must be exactly 10 digits"),
+      email: z.string().email("Invalid email address"),
+    }))
+    .mutation(async ({ input }) => {
+      const payload = verifyToken(input.token);
+      if (!payload || typeof payload.bowlerId !== "number") {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired session." });
+      }
+      const bowlerId = payload.bowlerId as number;
+      const bowler = await getBowlerProfile(bowlerId);
+      if (!bowler) throw new TRPCError({ code: "NOT_FOUND", message: "Bowler not found." });
+
+      // Cancel any existing pending request for this bowler
+      await rawQuery(`UPDATE contact_requests SET status = 'rejected' WHERE bowlerId = ? AND status = 'pending'`, [bowlerId]);
+
+      const now = Date.now();
+      await rawQuery(
+        `INSERT INTO contact_requests (bowlerId, eventId, phone, email, status, createdAt) VALUES (?, ?, ?, ?, 'pending', ?)`,
+        [bowlerId, bowler.eventId ?? 0, input.phone, input.email, now]
+      );
+
+      // Notify Event Director
+      const name = `${bowler.legalFirstName ?? ""} ${bowler.legalLastName ?? ""}`.trim();
+      notifyOwner({
+        title: `📱 Contact Info Submitted: ${name}`,
+        content: `Bowler ${name} (ID: ${bowler.scantronId ?? bowlerId}) has submitted their contact info:\n\nPhone: ${input.phone}\nEmail: ${input.email}\n\nPlease review and confirm in the Event Director portal → Roster → Contact Requests.`,
+      }).catch(() => {});
+
+      return { success: true };
+    }),
+
+  // ── LIST CONTACT REQUESTS (Event Director) ──────────────────────────────────
+  listContactRequests: publicProcedure
+    .input(z.object({ token: z.string(), eventId: z.number() }))
+    .query(async ({ input }) => {
+      const payload = verifyToken(input.token);
+      if (!payload || payload.role !== "EventDirector") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Event Director access required." });
+      }
+      const rows = await rawQuery<{
+        id: number; bowlerId: number; phone: string; email: string;
+        status: string; createdAt: number; confirmedAt: number | null;
+        legalFirstName: string | null; legalLastName: string | null;
+        scantronId: string | null; laneNumber: number | null;
+        centerName: string | null; teamName: string | null;
+      }>(
+        `SELECT cr.id, cr.bowlerId, cr.phone, cr.email, cr.status, cr.createdAt, cr.confirmedAt,
+                b.legalFirstName, b.legalLastName, b.scantronId, b.laneNumber,
+                bc.centerName, t.teamName
+         FROM contact_requests cr
+         JOIN bowlers b ON b.id = cr.bowlerId
+         LEFT JOIN bowling_centers bc ON bc.id = b.centerId
+         LEFT JOIN teams t ON t.id = b.teamId
+         WHERE cr.eventId = ?
+         ORDER BY cr.createdAt DESC`,
+        [input.eventId]
+      );
+      return rows;
+    }),
+
+  // ── CONFIRM CONTACT REQUEST (ED confirms → updates DB + writes to Google Sheet) ──
+  confirmContactRequest: publicProcedure
+    .input(z.object({ token: z.string(), requestId: z.number() }))
+    .mutation(async ({ input }) => {
+      const payload = verifyToken(input.token);
+      if (!payload || payload.role !== "EventDirector") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Event Director access required." });
+      }
+      const [req] = await rawQuery<{
+        id: number; bowlerId: number; phone: string; email: string; status: string;
+      }>(`SELECT id, bowlerId, phone, email, status FROM contact_requests WHERE id = ? LIMIT 1`, [input.requestId]);
+      if (!req) throw new TRPCError({ code: "NOT_FOUND", message: "Request not found." });
+      if (req.status !== "pending") throw new TRPCError({ code: "BAD_REQUEST", message: "Request is not pending." });
+
+      // Update bowler phone + email in DB
+      await rawQuery(`UPDATE bowlers SET phone = ?, email = ? WHERE id = ?`, [req.phone, req.email, req.bowlerId]);
+      await rawQuery(`UPDATE contact_requests SET status = 'confirmed', confirmedAt = ? WHERE id = ?`, [Date.now(), req.id]);
+
+      // Write to Google Sheet (fire-and-forget)
+      const bowler = await getBowlerProfile(req.bowlerId);
+      if (bowler) {
+        writeContactInfoToSheet({
+          firstName: bowler.legalFirstName ?? "",
+          lastName: bowler.legalLastName ?? "",
+          laneNumber: bowler.laneNumber ?? null,
+          phone: req.phone,
+          email: req.email,
+        }).catch((err: unknown) => console.error("[googleSheets] writeContactInfo failed:", err));
+      }
+
+      return { success: true };
     }),
 
   // ── CAPTAIN: VERIFY A BOWLER ────────────────────────────────────────────────

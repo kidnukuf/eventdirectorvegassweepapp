@@ -152,6 +152,37 @@ export async function writeQRCodesToSheet(params: {
 }
 
 /**
+ * Write phone and email into columns A and B of the bowler's row in the Google Sheet.
+ * Called when the Event Director confirms a contact info request.
+ */
+export async function writeContactInfoToSheet(params: {
+  firstName: string;
+  lastName: string;
+  laneNumber: number | null;
+  phone: string;
+  email: string;
+}): Promise<{ rowNum: number | null }> {
+  const { firstName, lastName, laneNumber, phone, email } = params;
+  try {
+    const rowNum = await findBowlerRow(firstName, lastName, laneNumber);
+    if (!rowNum) {
+      console.warn(`[googleSheets] writeContactInfo: Bowler not found: ${firstName} ${lastName}`);
+      return { rowNum: null };
+    }
+    const updateData = [
+      { range: `${SHEET_NAME}!A${rowNum}`, values: [[phone]] },
+      { range: `${SHEET_NAME}!B${rowNum}`, values: [[email]] },
+    ];
+    gws({}, { valueInputOption: "RAW", data: updateData });
+    console.log(`[googleSheets] Contact info written for ${firstName} ${lastName} (row ${rowNum})`);
+    return { rowNum };
+  } catch (err) {
+    console.error("[googleSheets] writeContactInfoToSheet error:", err);
+    return { rowNum: null };
+  }
+}
+
+/**
  * Normalize squad time codes to human-readable labels.
  * Used for display in the app UI.
  */

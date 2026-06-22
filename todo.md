@@ -342,3 +342,27 @@
 - [x] Add DNS CNAME for vegasvalentinefuntime.com → vegasweeps-y8eywesk.manus.space in Cloudflare (done manually by user)
 - [x] Add all 3 new domains to Manus Management UI (all 5 domains now bound and live)
 - [x] TypeScript check (0 errors), save checkpoint
+
+## Phase 29: Banquet Info — Time, Table Assignment, Location
+
+- [ ] Read updated Google Sheet to confirm column W (banquet table), X (extra banquet), Y (extra pool party) headers
+- [ ] Add banquetTable column to bowlers table in schema
+- [ ] Add banquetLocation and banquetTime columns to events table in schema
+- [ ] Run migration SQL for new columns
+- [ ] Update import parser: parse column W as banquetTable, update X/Y column aliases for extra banquet and extra pool party
+- [ ] Update ED portal: add Banquet Location + Banquet Time fields to Event Settings (applies to all bowlers in that event)
+- [ ] Update ED portal: add banquetTable field to bowler edit panel
+- [ ] Update server bowler profile query to return banquetTable, banquetTime, banquetLocation (from event)
+- [ ] Update BowlerDashboard Lane to Banquet section: show banquet time, table, location, early-arrival note
+- [ ] Update CaptainDashboard Lane to Banquet section: same as bowler
+- [ ] TypeScript check, push to GitHub, save checkpoint
+
+## Phase 30: Contact Info Request Flow (Bowler → ED → Google Sheet)
+- [ ] Add contact_requests table (bowlerId, phone, email, status pending/confirmed/rejected, sheetRow, spreadsheetId, createdAt, confirmedAt)
+- [ ] Run migration SQL for contact_requests table
+- [ ] Server: bowlerAuth.submitContactRequest — validate 10-digit phone + email, insert row, send ED notification
+- [ ] Server: bowlerAuth.listContactRequests — returns all pending requests (ED only)
+- [ ] Server: bowlerAuth.confirmContactRequest — update bowler phone+email in DB, write phone to col A and email to col B in Google Sheet row, mark request confirmed
+- [ ] BowlerDashboard: replace "contact info unavailable" static text with inline form (phone + email fields, 10-digit validation, Send button, success state)
+- [ ] CaptainDashboard: same inline contact info form
+- [ ] AdminDashboard: add Contact Requests panel (Roster tab or new section) — list pending requests with bowler name, submitted phone/email, Confirm button

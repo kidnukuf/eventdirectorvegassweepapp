@@ -174,11 +174,13 @@ export async function getBowlersByTeam(teamId: number) {
 
 export async function getBowlerById(id: number) {
   const rows = await rawQuery(`
-    SELECT b.*, bc.centerName, bc.centerCode, t.teamName, t.teamCode, l.leagueName, l.leagueCode, l.eventCode
+    SELECT b.*, bc.centerName, bc.centerCode, t.teamName, t.teamCode, l.leagueName, l.leagueCode, l.eventCode,
+           e.banquetLocation, e.banquetTime
     FROM bowlers b
     LEFT JOIN bowling_centers bc ON b.centerId = bc.id
     LEFT JOIN teams t ON b.teamId = t.id
     LEFT JOIN leagues l ON b.leagueId = l.id
+    LEFT JOIN events e ON b.eventId = e.id
     WHERE b.id = ? LIMIT 1
   `, [id]);
   return rows[0] ?? null;

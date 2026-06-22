@@ -59,6 +59,9 @@ export const events = mysqlTable("events", {
   status: mysqlEnum("status", ["planning", "active", "completed"]).default("planning").notNull(),
   tabletPin: varchar("tabletPin", { length: 6 }),
   sortOrder: int("sortOrder").default(0),
+  // Banquet info — applies to ALL bowlers in this event
+  banquetLocation: text("banquetLocation"),
+  banquetTime: varchar("banquetTime", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -161,6 +164,8 @@ export const bowlers = mysqlTable("bowlers", {
   poolPartyUsed: boolean("poolPartyUsed").default(false).notNull(),
   banquetToken: varchar("banquetToken", { length: 64 }).unique(),
   banquetUsed: boolean("banquetUsed").default(false).notNull(),
+  // Banquet table assignment (e.g. "Choose a seat at Tables 1, 2, 3, or 4") — set by ED per bowler
+  banquetTable: text("banquetTable"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -378,3 +383,19 @@ export const guestPoolPartyTokens = mysqlTable("guest_pool_party_tokens", {
 });
 
 export type GuestPoolPartyToken = typeof guestPoolPartyTokens.$inferSelect;
+
+// ─── CONTACT REQUESTS (bowler submits phone/email → ED confirms → writes to Google Sheet) ──
+export const contactRequests = mysqlTable("contact_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  bowlerId: int("bowlerId").notNull(),
+  eventId: int("eventId").notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["pending", "confirmed", "rejected"]).default("pending").notNull(),
+  sheetRow: int("sheetRow"),
+  spreadsheetId: varchar("spreadsheetId", { length: 255 }),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull().default(0),
+  confirmedAt: bigint("confirmedAt", { mode: "number" }),
+});
+
+export type ContactRequest = typeof contactRequests.$inferSelect;

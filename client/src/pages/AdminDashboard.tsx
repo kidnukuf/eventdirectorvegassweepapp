@@ -377,6 +377,14 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
   // Tablet PIN
   const [tabletPin, setTabletPin] = useState("");
   const [tabletPinSaved, setTabletPinSaved] = useState(false);
+  // Banquet event settings
+  const [banquetLocation, setBanquetLocation] = useState("");
+  const [banquetTime, setBanquetTime] = useState("");
+  const [banquetSaved, setBanquetSaved] = useState(false);
+  // ED token (used for contact request procedures)
+  const edToken = getEdToken() ?? "";
+  // Contact requests
+  const [contactReqSearch, setContactReqSearch] = useState("");
   // Admin camera scanner
   const [adminScanMode, setAdminScanMode] = useState<"checkin" | "passport">("checkin");
   const [adminPassportMode, setAdminPassportMode] = useState<"pool" | "banquet">("pool");
@@ -620,6 +628,32 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
 
   const setTabletPinMut = trpc.setTabletPin.useMutation({
     onSuccess: () => { toast.success("Tablet PIN saved"); setTabletPinSaved(true); setTimeout(() => setTabletPinSaved(false), 3000); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Banquet info for current event
+  const { data: banquetInfo } = trpc.event.getBanquetInfo.useQuery(
+    { id: EVENT_ID },
+    { enabled: EVENT_ID > 0 }
+  );
+  useEffect(() => {
+    if (banquetInfo) {
+      setBanquetLocation(String(banquetInfo.banquetLocation ?? ""));
+      setBanquetTime(String(banquetInfo.banquetTime ?? ""));
+    }
+  }, [banquetInfo]);
+  const updateBanquetInfoMut = trpc.event.updateBanquetInfo.useMutation({
+    onSuccess: () => { toast.success("Banquet info saved"); setBanquetSaved(true); setTimeout(() => setBanquetSaved(false), 3000); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Contact requests: list + confirm
+  const { data: contactRequests = [], refetch: refetchContactRequests } = trpc.bowlerAuth.listContactRequests.useQuery(
+    { token: edToken, eventId: EVENT_ID },
+    { enabled: !!edToken && EVENT_ID > 0 }
+  );
+  const confirmContactRequestMut = trpc.bowlerAuth.confirmContactRequest.useMutation({
+    onSuccess: () => { toast.success("Contact info confirmed and written to Google Sheet!"); refetchContactRequests(); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -874,6 +908,92 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                 </div>
               )}
             </div>
+            {/* ── Contact Requests Panel ── */}
+            {(() => {
+              type ContactReq = { id: number; bowlerId: number; phone: string; email: string; status: string; createdAt: number; confirmedAt: number | null; legalFirstName: string | null; legalLastName: string | null; scantronId: string | null; laneNumber: number | null; centerName: string | null; teamName: string | null; };
+              const allReqs = contactRequests as ContactReq[];
+              const pendingReqs = allReqs.filter((r) => r.status === "pending");
+              const filteredReqs = allReqs.filter((r) => {
+                if (!contactReqSearch) return true;
+                const q = contactReqSearch.toLowerCase();
+                return (
+                  String(r.legalFirstName ?? "").toLowerCase().includes(q) ||
+                  String(r.legalLastName ?? "").toLowerCase().includes(q) ||
+                  String(r.phone ?? "").includes(q) ||
+                  String(r.email ?? "").toLowerCase().includes(q)
+                );
+              });
+              if (allReqs.length === 0) return null;
+              return (
+                <div className="mb-6 bg-[#1a1a1a] border border-yellow-500/30 rounded-2xl overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📱</span>
+                      <div>
+                        <h3 className="text-yellow-400 font-bold text-base">Contact Info Requests</h3>
+                        <p className="text-gray-400 text-xs">{pendingReqs.length} pending • {allReqs.length} total</p>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search requests..."
+                      value={contactReqSearch}
+                      onChange={(e) => setContactReqSearch(e.target.value)}
+                      className="px-3 py-1.5 bg-[#111] border border-white/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-yellow-500 w-48"
+                    />
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10 text-left">
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Bowler</th>
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Phone</th>
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Email</th>
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Submitted</th>
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Status</th>
+                          <th className="px-4 py-3 text-gray-400 font-semibold">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReqs.map((r) => (
+                          <tr key={r.id} className={`border-b border-white/5 ${r.status === "pending" ? "bg-yellow-500/5" : ""}`}>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-white">{r.legalFirstName} {r.legalLastName}</div>
+                              <div className="text-xs text-gray-500">{r.centerName} • {r.teamName}</div>
+                            </td>
+                            <td className="px-4 py-3 text-cyan-300 font-mono text-sm">{r.phone}</td>
+                            <td className="px-4 py-3 text-cyan-300 text-sm">{r.email}</td>
+                            <td className="px-4 py-3 text-gray-400 text-xs">{new Date(r.createdAt).toLocaleString()}</td>
+                            <td className="px-4 py-3">
+                              {r.status === "pending" ? (
+                                <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-bold">⏳ Pending</span>
+                              ) : r.status === "confirmed" ? (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold">✅ Confirmed</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 text-xs font-bold">❌ Rejected</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {r.status === "pending" && (
+                                <button
+                                  onClick={() => confirmContactRequestMut.mutate({ token: edToken, requestId: r.id })}
+                                  disabled={confirmContactRequestMut.isPending}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                                >
+                                  {confirmContactRequestMut.isPending ? "Saving…" : "✅ Confirm"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {filteredReqs.length === 0 && <div className="text-center py-6 text-gray-500 text-sm">No matching requests.</div>}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="mb-4 flex gap-3 flex-wrap">
               <input type="text" placeholder="🔍 Search by name, ID, phone, center, team..." value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -937,7 +1057,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                           <td className="px-4 py-2 text-gray-400 text-xs">{String(b.teamName ?? "—")}</td>
                           <td className="px-4 py-2 text-gray-400">{String(b.phone ?? "—")}</td>
                           <td className="px-4 py-2"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[String(b.registrationStatus ?? "pre_registered")]}`}>{STATUS_LABELS[String(b.registrationStatus ?? "pre_registered")] ?? String(b.registrationStatus)}</span></td>
-                          <td className="px-4 py-2"><button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false" }); }} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button></td>
+                          <td className="px-4 py-2"><button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") }); }} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button></td>
                         </tr>
                         );
                       })}
@@ -1010,7 +1130,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                                     </span>
                                   </td>
                                   <td className="px-4 py-2">
-                                    <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false" });
+                                    <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") });
                                     }}
                                       className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button>
                                   </td>
@@ -1048,6 +1168,41 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                   <p><strong>Bowling Check-In:</strong> Scans the Entry Ticket QR from the bowler portal to check them in for bowling. Also supports Bluetooth HID scanners and manual token entry.</p>
                 </div>
               )}
+            </div>
+
+            {/* Banquet Event Settings */}
+            <h2 className="text-xl font-bold text-yellow-400">🍽️ Banquet Dinner Settings</h2>
+            <div className="bg-[#1a1a1a] rounded-2xl border border-yellow-500/30 p-5">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-1">Event-Wide Banquet Info</h3>
+              <p className="text-gray-500 text-xs mb-4">Set the banquet location and time for this event. This info will appear on every bowler's dashboard under Banquet Dinner. Individual table assignments are set per-bowler (via import or the Edit panel).</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Banquet Location</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Orleans Arena Ballroom"
+                    value={banquetLocation}
+                    onChange={(e) => setBanquetLocation(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 mb-1 block">Banquet Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Saturday 6:00 PM"
+                    value={banquetTime}
+                    onChange={(e) => setBanquetTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#111] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => updateBanquetInfoMut.mutate({ id: EVENT_ID, banquetLocation: banquetLocation || undefined, banquetTime: banquetTime || undefined })}
+                disabled={updateBanquetInfoMut.isPending}
+                className="mt-4 px-5 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white font-bold rounded-lg text-sm transition-all active:scale-95">
+                {updateBanquetInfoMut.isPending ? "Saving..." : banquetSaved ? "✅ Saved!" : "Save Banquet Info"}
+              </button>
             </div>
 
             <h2 className="text-xl font-bold text-yellow-400">🚪 Doorman Tablet Setup</h2>
@@ -1295,7 +1450,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                       <div className="text-gray-500 text-xs mt-1">Signed up: {b.createdAt ? new Date(b.createdAt as string).toLocaleString() : "—"}</div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), registrationStatus: "signed_up", sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false" }); setShowAllFields(true); }}
+                      <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), registrationStatus: "signed_up", sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") }); setShowAllFields(true); }}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold transition-colors">Link / Edit</button>
                       <span className="px-2 py-1 bg-red-900/50 text-red-300 rounded text-xs">Unmatched</span>
                     </div>
@@ -1429,6 +1584,17 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                         League Member
                       </label>
                     </div>
+                  </div>
+                  {/* Banquet Table Assignment */}
+                  <div className="pt-2 border-t border-yellow-500/20">
+                    <p className="text-xs text-yellow-400/80 mb-2 uppercase tracking-wide">🍽️ Banquet Table Assignment</p>
+                    <label className="text-xs text-gray-400 mb-1 block">Banquet Table (e.g. "Choose a seat at Tables 1, 2, 3, or 4")</label>
+                    <input
+                      value={editFields.banquetTable ?? ""}
+                      onChange={(e) => setEditFields({ ...editFields, banquetTable: e.target.value })}
+                      placeholder="e.g. Choose a seat at Tables 1, 2, 3, or 4"
+                      className="w-full px-3 py-2 bg-[#111] border border-yellow-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500" />
+                    <p className="text-xs text-gray-500 mt-1">This message will appear on the bowler's dashboard under Banquet Dinner info.</p>
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 mb-1 block">Registration Status Override</label>
