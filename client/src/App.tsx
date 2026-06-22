@@ -178,6 +178,23 @@ function PwaIconInjector() {
   return null;
 }
 
+/** Redirects wwwfuntimeteamchallenge.com straight to the ED portal */
+function EdDomainRedirector() {
+  const [location, navigate] = useLocation();
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const isEdDomain =
+    hostname === "wwwfuntimeteamchallenge.com" ||
+    hostname === "www.wwwfuntimeteamchallenge.com";
+
+  useEffect(() => {
+    if (isEdDomain && location === "/") {
+      navigate("/ed", { replace: true });
+    }
+  }, [isEdDomain, location, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -185,6 +202,7 @@ function App() {
         <TooltipProvider>
           <PwaIconInjector />
           <EdIconInjector />
+          <EdDomainRedirector />
           <VideoSplash />
           <OfflineBanner />
           <Toaster />

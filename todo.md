@@ -332,3 +332,13 @@
 - [x] Updated CaptainLogin: uses trpc.event.activeByGroupSlug to resolve eventId from domain slug (fully isolated per website)
 - [x] Home.tsx already has June group selector (Group 1-4 picker) and "Change Group" footer link
 - [x] TypeScript clean (0 errors), push to GitHub, save checkpoint
+
+## Phase 28: wwwfuntimeteamchallenge.com — Dedicated ED Portal Domain
+
+- [x] Detect wwwfuntimeteamchallenge.com in App.tsx and auto-redirect to /ed (EdDomainRedirector component)
+- [x] Update AdminDashboard login header to show "Funtime Team Challenge — Staff Access Portal" in gold/purple when on that domain
+- [ ] Add DNS CNAME for wwwfuntimeteamchallenge.com → vegasweeps-y8eywesk.manus.space in Cloudflare (manual — API token needs DNS Edit scope)
+- [ ] Add DNS CNAME for funtimeteamchallenge.com → vegasweeps-y8eywesk.manus.space in Cloudflare (manual)
+- [ ] Add DNS CNAME for vegasvalentinefuntime.com → vegasweeps-y8eywesk.manus.space in Cloudflare (manual)
+- [ ] Add all 3 new domains to Manus Management UI (Settings → Domains)
+- [x] TypeScript check (0 errors), save checkpoint

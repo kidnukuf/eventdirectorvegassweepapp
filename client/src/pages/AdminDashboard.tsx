@@ -56,12 +56,29 @@ function EdLoginGate({ onAuth }: { onAuth: () => void }) {
               style={{ filter: "drop-shadow(0 0 16px rgba(255,215,0,0.6))" }}
             />
           </div>
-          <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
-            EVENT DIRECTOR
-          </h1>
-          <p className="bob-header-title text-gray-200 text-sm mt-1 font-semibold cursor-default select-none" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</p>
-          <p className="bob-header-subtitle text-amber-300 text-xs font-semibold tracking-widest uppercase cursor-default select-none">Bowlers Orleans Bound</p>
-          <p className="text-gray-500 text-xs mt-0.5">Staff access only</p>
+          {(() => {
+            const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+            const isEdDomain = hostname === "wwwfuntimeteamchallenge.com" || hostname === "www.wwwfuntimeteamchallenge.com";
+            return isEdDomain ? (
+              <>
+                <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#d4af37", textShadow: "0 0 20px rgba(212,175,55,0.5)" }}>
+                  EVENT DIRECTOR
+                </h1>
+                <p className="text-purple-300 text-sm mt-1 font-semibold cursor-default select-none" style={{ fontFamily: "'Orbitron', sans-serif" }}>Funtime Team Challenge</p>
+                <p className="text-yellow-400/70 text-xs font-semibold tracking-widest uppercase cursor-default select-none">Staff Access Portal</p>
+                <p className="text-gray-500 text-xs mt-0.5">Authorized personnel only</p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-3xl font-black tracking-tight" style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ffd700", textShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
+                  EVENT DIRECTOR
+                </h1>
+                <p className="bob-header-title text-gray-200 text-sm mt-1 font-semibold cursor-default select-none" style={{ fontFamily: "'Orbitron', sans-serif" }}>B.O.B. Roll-off Passport</p>
+                <p className="bob-header-subtitle text-amber-300 text-xs font-semibold tracking-widest uppercase cursor-default select-none">Bowlers Orleans Bound</p>
+                <p className="text-gray-500 text-xs mt-0.5">Staff access only</p>
+              </>
+            );
+          })()}
         </div>
 
         {/* Login card */}
