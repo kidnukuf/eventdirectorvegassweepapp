@@ -171,7 +171,7 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
       </div>
 
       <div
-        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-96 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
+        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-[2000px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
       >
         {animating && (
           <div className="h-0.5 w-full rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 animate-pulse" />

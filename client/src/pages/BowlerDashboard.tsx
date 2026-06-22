@@ -104,9 +104,9 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
         </span>
       </div>
 
-      {/* Expanded content with slide-down animation */}
+      {/* Expanded content with slide-down animation — no max-h cap so all content is visible */}
       <div
-        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-96 opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
+        className={`overflow-hidden transition-all duration-500 ease-out ${open ? "max-h-[2000px] opacity-100 mt-4" : "max-h-0 opacity-0 mt-0"}`}
       >
         {/* Animated shimmer bar when opening */}
         {animating && (
