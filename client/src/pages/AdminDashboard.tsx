@@ -2,6 +2,14 @@ import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ─── Local storage key for ED session ────────────────────────────────────────
 const ED_TOKEN_KEY = "vsn_ed_token";
@@ -706,73 +714,89 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
             </h1>
           </div>
           <div className="flex gap-2">
-            <div className="relative">
-              <button onClick={() => setShowExportMenu(!showExportMenu)} className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors">📤 Export ▾</button>
-              {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-[#1a1a1a] border border-yellow-500/30 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden"
-                     style={{ maxWidth: "calc(100vw - 1rem)", right: 0 }}>
-                  <button onClick={exportFullRoster} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-yellow-300 transition-colors">📋 Full Roster</button>
-                  <button onClick={exportByCenter} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-yellow-300 transition-colors">🏠 Per-Center Roster</button>
-                  <button onClick={exportCheckedIn} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-cyan-300 transition-colors">✅ Check-In Status</button>
-                  <button onClick={exportAuditLog} className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-gray-300 transition-colors">📜 Audit Log</button>
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button onClick={() => setShowEventMenu(!showEventMenu)} className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-semibold transition-colors">🗓️ Events ▾</button>
-              {showEventMenu && (
-                <div className="absolute top-full mt-1 bg-[#1a1a1a] border border-yellow-500/30 rounded-xl shadow-xl z-50 overflow-hidden"
-                     style={{ minWidth: "260px", maxWidth: "calc(100vw - 1rem)", maxHeight: "70vh", overflowY: "auto", right: 0 }}>
-                  <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-gray-500 border-b border-white/10">Switch active event</div>
-                  {groupedEvents.length > 0 ? groupedEvents.map(({ slug, label, color, events: gEvts }) => (
-                    <div key={slug}>
-                      <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider font-bold border-b border-white/5"
-                           style={{ color, background: `${color}18` }}>
-                        {label}
-                      </div>
-                      {gEvts.map((e) => {
-                        const id = Number(e.id);
-                        const isActive = id === EVENT_ID;
-                        return (
-                          <button
-                            key={id}
-                            onClick={() => { selectEvent(id); setShowEventMenu(false); }}
-                            className={`w-full px-5 py-2 text-left text-sm transition-colors flex items-center justify-between gap-2 ${isActive ? "bg-yellow-500/15 text-yellow-300" : "hover:bg-white/5 text-gray-200"}`}
-                          >
-                            <span className="truncate">{String(e.eventName)} <span className="text-gray-500">· {String(e.eventYear)}</span></span>
-                            {isActive && <span className="text-[10px]" style={{ color }}>● selected</span>}
-                          </button>
-                        );
-                      })}
+            {/* Export dropdown — uses Radix portal for viewport-safe positioning */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition-colors">📤 Export ▾</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="bg-[#1a1a1a] border-yellow-500/30 text-white min-w-[200px]"
+              >
+                <DropdownMenuLabel className="text-gray-500 text-[10px] uppercase tracking-wider">Export Data</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={exportFullRoster} className="text-yellow-300 focus:bg-yellow-500/10 focus:text-yellow-300 cursor-pointer">📋 Full Roster</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportByCenter} className="text-yellow-300 focus:bg-yellow-500/10 focus:text-yellow-300 cursor-pointer">🏠 Per-Center Roster</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCheckedIn} className="text-cyan-300 focus:bg-cyan-500/10 focus:text-cyan-300 cursor-pointer">✅ Check-In Status</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportAuditLog} className="text-gray-300 focus:bg-white/5 focus:text-gray-300 cursor-pointer">📜 Audit Log</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Events dropdown — uses Radix portal for viewport-safe positioning */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded-lg text-sm font-semibold transition-colors">🗓️ Events ▾</button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="bg-[#1a1a1a] border-yellow-500/30 text-white w-[min(320px,calc(100vw-1rem))] max-h-[70vh] overflow-y-auto"
+              >
+                <DropdownMenuLabel className="text-gray-500 text-[10px] uppercase tracking-wider">Switch active event</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                {groupedEvents.length > 0 ? groupedEvents.map(({ slug, label, color, events: gEvts }) => (
+                  <div key={slug}>
+                    <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider font-bold"
+                         style={{ color, background: `${color}18` }}>
+                      {label}
                     </div>
-                  )) : (events as Record<string, unknown>[]).map((e) => {
-                    const id = Number(e.id);
-                    const isActive = id === EVENT_ID;
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => { selectEvent(id); setShowEventMenu(false); }}
-                        className={`w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center justify-between gap-2 ${isActive ? "bg-yellow-500/15 text-yellow-300" : "hover:bg-white/5 text-gray-200"}`}
-                      >
-                        <span className="truncate">{String(e.eventName)} <span className="text-gray-500">· {String(e.eventYear)}</span></span>
-                        {isActive && <span className="text-[10px] text-yellow-400">● active</span>}
-                      </button>
-                    );
-                  })}
-                  {/* Import Data shortcut per group */}
-                  <div className="border-t border-white/5 px-4 py-2 text-[10px] text-gray-600 italic">
-                    Select an event above, then click “Import Data” to load bowlers into that event.
+                    {gEvts.map((e) => {
+                      const id = Number(e.id);
+                      const isActive = id === EVENT_ID;
+                      return (
+                        <DropdownMenuItem
+                          key={id}
+                          onClick={() => selectEvent(id)}
+                          className={`pl-4 cursor-pointer flex items-center justify-between gap-2 ${
+                            isActive ? "bg-yellow-500/15 text-yellow-300 focus:bg-yellow-500/20 focus:text-yellow-300" : "text-gray-200 focus:bg-white/5 focus:text-gray-200"
+                          }`}
+                        >
+                          <span className="truncate">{String(e.eventName)} <span className="text-gray-500">· {String(e.eventYear)}</span></span>
+                          {isActive && <span className="text-[10px] shrink-0" style={{ color }}>● selected</span>}
+                        </DropdownMenuItem>
+                      );
+                    })}
                   </div>
-                  <div className="border-t border-white/10">
-                    <button onClick={() => { setEventModal({ mode: "create", name: "", year: String(new Date().getFullYear()) }); setShowEventMenu(false); }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-green-500/10 text-green-300 transition-colors">＋ Create New Event</button>
-                    <button
-                      onClick={() => { if (activeEvent) { setEventModal({ mode: "rename", name: String(activeEvent.eventName), year: String(activeEvent.eventYear), id: EVENT_ID }); } setShowEventMenu(false); }}
-                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-yellow-500/10 text-yellow-300 transition-colors"
-                    >✏️ Rename Current Event</button>
-                  </div>
+                )) : (events as Record<string, unknown>[]).map((e) => {
+                  const id = Number(e.id);
+                  const isActive = id === EVENT_ID;
+                  return (
+                    <DropdownMenuItem
+                      key={id}
+                      onClick={() => selectEvent(id)}
+                      className={`cursor-pointer flex items-center justify-between gap-2 ${
+                        isActive ? "bg-yellow-500/15 text-yellow-300 focus:bg-yellow-500/20 focus:text-yellow-300" : "text-gray-200 focus:bg-white/5 focus:text-gray-200"
+                      }`}
+                    >
+                      <span className="truncate">{String(e.eventName)} <span className="text-gray-500">· {String(e.eventYear)}</span></span>
+                      {isActive && <span className="text-[10px] text-yellow-400 shrink-0">● active</span>}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator className="bg-white/5" />
+                <div className="px-2 py-1.5 text-[10px] text-gray-600 italic">
+                  Select an event above, then click “Import Data” to load bowlers.
                 </div>
-              )}
-            </div>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  onClick={() => setEventModal({ mode: "create", name: "", year: String(new Date().getFullYear()) })}
+                  className="text-green-300 focus:bg-green-500/10 focus:text-green-300 cursor-pointer"
+                >＋ Create New Event</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => { if (activeEvent) setEventModal({ mode: "rename", name: String(activeEvent.eventName), year: String(activeEvent.eventYear), id: EVENT_ID }); }}
+                  className="text-yellow-300 focus:bg-yellow-500/10 focus:text-yellow-300 cursor-pointer"
+                >✏️ Rename Current Event</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button onClick={() => setLocation("/import")} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold transition-colors">📥 Import Data</button>
           </div>
         </div>
