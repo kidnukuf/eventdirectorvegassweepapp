@@ -984,19 +984,42 @@ export const appRouter = router({
         const rows = await rawQuery(
           `SELECT b.id, b.legalFirstName, b.legalLastName, b.scantronId,
                   b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed,
+                  b.banquetTable,
                   et.tokenValue AS bowlingToken, et.isUsed AS bowlingUsed
            FROM bowlers b
            LEFT JOIN entry_tokens et ON et.bowlerId = b.id AND et.eventId = ? AND et.isUsed = 0 AND et.tokenType != 'test'
            WHERE b.eventId = ? AND b.registrationStatus != 'pre_registered'`,
           [input.eventId, input.eventId]
         ) as Record<string, unknown>[];
-        const event = await getActiveEvent() as Record<string, unknown> | null;
+        // Fetch guest pool tokens for all bowlers in this event
+        const guestTokens = await rawQuery(
+          `SELECT g.bowlerId, g.suffix, g.token, g.used, g.disabled
+           FROM guest_pool_party_tokens g
+           INNER JOIN bowlers b ON b.id = g.bowlerId
+           WHERE b.eventId = ? AND g.disabled = 0`,
+          [input.eventId]
+        ) as { bowlerId: number; suffix: string; token: string; used: number; disabled: number }[];
+        // Group guest tokens by bowlerId
+        const guestMap: Record<number, Array<{ suffix: string; token: string; used: boolean }>> = {};
+        for (const gt of guestTokens) {
+          if (!guestMap[gt.bowlerId]) guestMap[gt.bowlerId] = [];
+          guestMap[gt.bowlerId].push({ suffix: gt.suffix, token: gt.token, used: Boolean(gt.used) });
+        }
+        // Attach guest tokens to each bowler row
+        const enrichedRows = rows.map(b => ({
+          ...b,
+          guestPoolTokens: guestMap[b.id as number] ?? [],
+        }));
+        // Use the specific event (not just the active one)
+        const event = await getEventById(input.eventId) as Record<string, unknown> | null;
         return {
           exportedAt: Date.now(),
           eventId: input.eventId,
-          eventName: (event as Record<string, unknown>)?.eventName ?? 'B.O.B. Roll-off',
-          tabletPin: (event as Record<string, unknown>)?.tabletPin ?? null,
-          bowlers: rows,
+          eventName: event?.eventName ?? 'B.O.B. Roll-off',
+          tabletPin: event?.tabletPin ?? null,
+          banquetLocation: event?.banquetLocation ?? null,
+          banquetTime: event?.banquetTime ?? null,
+          bowlers: enrichedRows,
         };
       }),
 
@@ -1004,9 +1027,9 @@ export const appRouter = router({
     syncRedemptions: publicProcedure
       .input(z.object({
         deviceId: z.string(),
-        redemptions: z.array(z.object({
+          redemptions: z.array(z.object({
           token: z.string(),
-          passportType: z.enum(['pool', 'banquet', 'bowling']),
+          passportType: z.enum(['pool', 'banquet', 'bowling', 'guest-pool']),
           bowlerId: z.number().optional(),
           scannedAt: z.number(),
         })),
@@ -1033,6 +1056,12 @@ export const appRouter = router({
               const existing = await rawQuery('SELECT banquetUsed FROM bowlers WHERE banquetToken=?', [r.token]) as Record<string, unknown>[];
               if (existing[0] && !existing[0].banquetUsed) {
                 await rawQuery('UPDATE bowlers SET banquetUsed=1 WHERE banquetToken=?', [r.token]);
+                synced++;
+              } else { skipped++; }
+            } else if (r.passportType === 'guest-pool') {
+              const existing = await rawQuery('SELECT id, used FROM guest_pool_party_tokens WHERE token=?', [r.token]) as Record<string, unknown>[];
+              if (existing[0] && !existing[0].used) {
+                await rawQuery('UPDATE guest_pool_party_tokens SET used=1 WHERE token=?', [r.token]);
                 synced++;
               } else { skipped++; }
             }

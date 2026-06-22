@@ -42,7 +42,15 @@ async function initDB() {
       poolPartyToken TEXT,
       poolPartyUsed INTEGER DEFAULT 0,
       banquetToken TEXT,
-      banquetUsed INTEGER DEFAULT 0
+      banquetUsed INTEGER DEFAULT 0,
+      banquetTable TEXT
+    );
+    CREATE TABLE IF NOT EXISTS guest_pool_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bowlerId INTEGER NOT NULL,
+      suffix TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      used INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS redemptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,11 +132,13 @@ app.post("/api/load-snapshot", (req, res) => {
 
   dbRun("DELETE FROM bowlers");
 
+  dbRun("DELETE FROM guest_pool_tokens");
+
   for (const b of snapshot.bowlers) {
     dbRun(
       `INSERT OR REPLACE INTO bowlers
-        (id, firstName, lastName, scantronId, bowlingToken, bowlingUsed, poolPartyToken, poolPartyUsed, banquetToken, banquetUsed)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        (id, firstName, lastName, scantronId, bowlingToken, bowlingUsed, poolPartyToken, poolPartyUsed, banquetToken, banquetUsed, banquetTable)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
         b.id,
         b.legalFirstName || "",
@@ -140,8 +150,18 @@ app.post("/api/load-snapshot", (req, res) => {
         b.poolPartyUsed ? 1 : 0,
         b.banquetToken || null,
         b.banquetUsed ? 1 : 0,
+        b.banquetTable || null,
       ]
     );
+    // Load guest pool tokens
+    if (Array.isArray(b.guestPoolTokens)) {
+      for (const gt of b.guestPoolTokens) {
+        dbRun(
+          `INSERT OR IGNORE INTO guest_pool_tokens (bowlerId, suffix, token, used) VALUES (?,?,?,?)`,
+          [b.id, gt.suffix, gt.token, gt.used ? 1 : 0]
+        );
+      }
+    }
   }
 
   if (snapshot.tabletPin) setConfig("tabletPin", snapshot.tabletPin);
@@ -190,6 +210,17 @@ app.post("/api/scan", (req, res) => {
     if (!bowler) return res.json({ success: false, error: "Token not found" });
     if (bowler.banquetUsed) { alreadyUsed = true; }
     else { dbRun("UPDATE bowlers SET banquetUsed=1 WHERE id=?", [bowler.id]); }
+  } else if (passportType === "guest-pool") {
+    bowler = dbGet(
+      `SELECT b.*, g.id as guestTokenId, g.used as guestUsed, g.suffix
+       FROM guest_pool_tokens g
+       INNER JOIN bowlers b ON b.id = g.bowlerId
+       WHERE g.token=?`,
+      [token]
+    );
+    if (!bowler) return res.json({ success: false, error: "Guest pass not found" });
+    if (bowler.guestUsed) { alreadyUsed = true; }
+    else { dbRun("UPDATE guest_pool_tokens SET used=1 WHERE token=?", [token]); }
   } else {
     return res.status(400).json({ success: false, error: "Unknown passportType" });
   }
@@ -220,13 +251,15 @@ app.post("/api/scan", (req, res) => {
 app.get("/api/status", (req, res) => {
   const bowlerRow = dbGet("SELECT COUNT(*) as c FROM bowlers");
   const pendingRow = dbGet("SELECT COUNT(*) as c FROM redemptions WHERE syncedToCloud=0");
+  const pin = getConfig("tabletPin");
   res.json({
-    ready: (bowlerRow?.c || 0) > 0 && !!getConfig("tabletPin"),
+    ready: (bowlerRow?.c || 0) > 0 && !!pin,
     bowlerCount: bowlerRow?.c || 0,
     pendingSyncCount: pendingRow?.c || 0,
     exportedAt: getConfig("exportedAt") ? Number(getConfig("exportedAt")) : null,
     eventName: getConfig("eventName"),
-    hasPin: !!getConfig("tabletPin"),
+    hasPin: !!pin,
+    pinLength: pin ? String(pin).length : 4,
   });
 });
 

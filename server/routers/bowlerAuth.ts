@@ -152,6 +152,9 @@ async function getBowlerProfile(bowlerId: number) {
     banquetUsed: number;
     guestPoolPartyAmount: string | null;
     eventId: number | null;
+    banquetTable: string | null;
+    banquetLocation: string | null;
+    banquetTime: string | null;
   }>(
     `SELECT b.id, b.legalFirstName, b.legalLastName, b.preferredName,
             b.email, b.phone, b.scantronId, b.registrationStatus,
@@ -162,7 +165,8 @@ async function getBowlerProfile(bowlerId: number) {
             h.hotelName, h.checkinDate, h.checkoutDate, h.roomType,
             p.totalAmountDue, p.paid,
             b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed,
-            b.guestPoolPartyAmount, b.eventId
+            b.guestPoolPartyAmount, b.eventId,
+            b.banquetTable, e.banquetLocation, e.banquetTime
      FROM bowlers b
      LEFT JOIN teams t ON t.id = b.teamId
      LEFT JOIN bowling_centers bc ON bc.id = b.centerId

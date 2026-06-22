@@ -580,8 +580,8 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
     const rows = (bowlers as Bowler[]);
     if (!rows.length) { toast.error("No data to export"); return; }
     downloadCSV(`${eventSlug}-full-roster.csv`,
-      ["ScantronID","FirstName","LastName","Phone","Email","Center","Team","Status","CheckIn","Room","Banquet","LaneAssignment","SquadTime"],
-      rows.map((b) => [b.scantronId,b.legalFirstName,b.legalLastName,b.phone,b.email,b.centerName,b.teamName,b.registrationStatus,b.checkinDate,b.roomType,b.banquetAmount,b.laneAssignment,b.squadTime] as string[])
+      ["ScantronID","FirstName","LastName","Phone","Email","Center","Team","Status","CheckIn","Room","Banquet","ExtraBanquet","ExtraPoolParty","BanquetTable","LaneAssignment","SquadTime"],
+      rows.map((b) => [b.scantronId,b.legalFirstName,b.legalLastName,b.phone,b.email,b.centerName,b.teamName,b.registrationStatus,b.checkinDate,b.roomType,b.banquetAmount,(b as any).extraBanquet ?? '',(b as any).guestPoolPartyAmount ?? '',(b as any).banquetTable ?? '',b.laneAssignment,b.squadTime] as string[])
     );
     toast.success("Full roster exported"); setShowExportMenu(false);
   };

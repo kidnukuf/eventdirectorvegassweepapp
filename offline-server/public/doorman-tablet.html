@@ -13,7 +13,7 @@
   .pin-logo { font-size: 3rem; margin-bottom: 8px; }
   .pin-title { color: #ffd700; font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
   .pin-subtitle { color: #6060a0; font-size: 0.85rem; margin-bottom: 32px; }
-  .pin-dots { display: flex; gap: 16px; margin-bottom: 32px; }
+  .pin-dots { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; justify-content: center; }
   .pin-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #3a3a5a; background: transparent; transition: all 0.15s; }
   .pin-dot.filled { background: #ffd700; border-color: #ffd700; }
   .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 280px; }
@@ -26,10 +26,10 @@
   #scanScreen { display: none; flex-direction: column; min-height: 100vh; }
   .scan-header { background: #1a1a3e; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a2a5a; }
   .scan-header h1 { color: #ffd700; font-size: 1rem; font-weight: 700; }
-  .mode-tabs { display: flex; gap: 4px; padding: 8px 16px; background: #0e0e24; }
-  .mode-tab { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #2a2a5a; background: transparent; color: #8080a0; font-size: 0.75rem; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .mode-tabs { display: flex; gap: 4px; padding: 8px 16px; background: #0e0e24; flex-wrap: wrap; }
+  .mode-tab { flex: 1; min-width: 70px; padding: 8px 4px; border-radius: 8px; border: 1px solid #2a2a5a; background: transparent; color: #8080a0; font-size: 0.7rem; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
   .mode-tab.active { background: #ffd700; color: #0a0a1a; border-color: #ffd700; }
-  .camera-container { position: relative; flex: 1; background: #000; overflow: hidden; }
+  .camera-container { position: relative; flex: 1; background: #000; overflow: hidden; min-height: 300px; }
   #video { width: 100%; height: 100%; object-fit: cover; }
   .scan-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
   .scan-frame { width: 240px; height: 240px; border: 3px solid rgba(255, 215, 0, 0.8); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
@@ -39,6 +39,7 @@
   .result-overlay.success { background: rgba(0, 80, 0, 0.92); }
   .result-overlay.denied { background: rgba(80, 0, 0, 0.92); }
   .result-overlay.already { background: rgba(80, 60, 0, 0.92); }
+  .result-overlay.disabled { background: rgba(60, 30, 0, 0.92); }
   .result-icon { font-size: 5rem; margin-bottom: 16px; }
   .result-name { color: #fff; font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: 8px; }
   .result-msg { color: rgba(255,255,255,0.8); font-size: 1rem; text-align: center; }
@@ -56,12 +57,7 @@
   <div class="pin-logo">🎳</div>
   <div class="pin-title">B.O.B. Doorman Scanner</div>
   <div class="pin-subtitle">Enter PIN to unlock</div>
-  <div class="pin-dots">
-    <div class="pin-dot" id="d0"></div>
-    <div class="pin-dot" id="d1"></div>
-    <div class="pin-dot" id="d2"></div>
-    <div class="pin-dot" id="d3"></div>
-  </div>
+  <div class="pin-dots" id="pinDots"></div>
   <div class="pin-pad">
     <button class="pin-btn" onclick="pinPress('1')">1</button>
     <button class="pin-btn" onclick="pinPress('2')">2</button>
@@ -89,6 +85,7 @@
     <button class="mode-tab active" id="tab-bowling" onclick="setMode('bowling')">🎳 Bowling</button>
     <button class="mode-tab" id="tab-banquet" onclick="setMode('banquet')">🍽️ Banquet</button>
     <button class="mode-tab" id="tab-pool" onclick="setMode('pool')">🏊 Pool Party</button>
+    <button class="mode-tab" id="tab-guest-pool" onclick="setMode('guest-pool')">🎟️ Guest Pass</button>
   </div>
   <div class="camera-container">
     <video id="video" autoplay muted playsinline></video>
@@ -105,7 +102,7 @@
   </div>
   <div class="manual-section">
     <div class="manual-input">
-      <input type="text" id="manualToken" placeholder="Paste QR token manually..." />
+      <input type="text" id="manualToken" placeholder="Paste QR token or full URL manually..." />
       <button onclick="manualScan()">Scan</button>
     </div>
   </div>
@@ -114,25 +111,42 @@
 <script>
 // ─── PIN Logic ────────────────────────────────────────────────────────────────
 let pinEntry = '';
-const PIN_LENGTH = 4;
+let pinLength = 4; // default; updated after first successful status check
+
+// Fetch the actual PIN length from the server so we know when to auto-submit
+async function fetchPinLength() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    if (d.pinLength && d.pinLength >= 4 && d.pinLength <= 6) {
+      pinLength = d.pinLength;
+    }
+  } catch(e) { /* use default 4 */ }
+  renderPinDots();
+}
+
+function renderPinDots() {
+  const container = document.getElementById('pinDots');
+  container.innerHTML = '';
+  for (let i = 0; i < pinLength; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'pin-dot' + (i < pinEntry.length ? ' filled' : '');
+    dot.id = 'd' + i;
+    container.appendChild(dot);
+  }
+}
 
 function pinPress(digit) {
-  if (pinEntry.length >= PIN_LENGTH) return;
+  if (pinEntry.length >= pinLength) return;
   pinEntry += digit;
-  updatePinDots();
-  if (pinEntry.length === PIN_LENGTH) verifyPin();
+  renderPinDots();
+  if (pinEntry.length === pinLength) verifyPin();
 }
 
 function pinDel() {
   pinEntry = pinEntry.slice(0, -1);
-  updatePinDots();
+  renderPinDots();
   document.getElementById('pinError').textContent = '';
-}
-
-function updatePinDots() {
-  for (let i = 0; i < PIN_LENGTH; i++) {
-    document.getElementById('d' + i).classList.toggle('filled', i < pinEntry.length);
-  }
 }
 
 async function verifyPin() {
@@ -150,8 +164,7 @@ async function verifyPin() {
     } else {
       document.getElementById('pinError').textContent = data.error || 'Incorrect PIN';
       pinEntry = '';
-      updatePinDots();
-      // Shake animation
+      renderPinDots();
       const pad = document.querySelector('.pin-pad');
       pad.style.animation = 'none';
       setTimeout(() => { pad.style.animation = ''; }, 10);
@@ -159,7 +172,7 @@ async function verifyPin() {
   } catch(e) {
     document.getElementById('pinError').textContent = 'Server error — check connection';
     pinEntry = '';
-    updatePinDots();
+    renderPinDots();
   }
 }
 
@@ -168,7 +181,7 @@ function lockScanner() {
   document.getElementById('scanScreen').style.display = 'none';
   document.getElementById('pinScreen').style.display = 'flex';
   pinEntry = '';
-  updatePinDots();
+  renderPinDots();
 }
 
 // ─── Camera / QR Logic ───────────────────────────────────────────────────────
@@ -179,8 +192,9 @@ let scanInterval = null;
 
 function setMode(mode) {
   currentMode = mode;
-  ['bowling', 'banquet', 'pool'].forEach(m => {
-    document.getElementById('tab-' + m).classList.toggle('active', m === mode);
+  ['bowling', 'banquet', 'pool', 'guest-pool'].forEach(m => {
+    const el = document.getElementById('tab-' + m);
+    if (el) el.classList.toggle('active', m === mode);
   });
 }
 
@@ -214,14 +228,11 @@ function scanFrame() {
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  // Use BarcodeDetector if available (Chrome on Android)
   if ('BarcodeDetector' in window) {
     const detector = new BarcodeDetector({ formats: ['qr_code'] });
     detector.detect(canvas).then(barcodes => {
       if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        handleScan(code);
+        handleScan(barcodes[0].rawValue);
       }
     }).catch(() => {});
   }
@@ -231,23 +242,32 @@ let resultTimeout = null;
 let lastScanned = '';
 let lastScannedTime = 0;
 
-async function handleScan(tokenValue) {
+async function handleScan(rawValue) {
   const now = Date.now();
-  // Debounce: don't re-scan same token within 3 seconds
-  if (tokenValue === lastScanned && now - lastScannedTime < 3000) return;
-  lastScanned = tokenValue;
+  if (rawValue === lastScanned && now - lastScannedTime < 3000) return;
+  lastScanned = rawValue;
   lastScannedTime = now;
-
-  await doScan(tokenValue);
+  await doScan(rawValue);
 }
 
-async function doScan(tokenValue) {
-  if (!tokenValue.trim()) return;
+// Parse a raw scan value — accepts either a raw token string or a full URL
+// like https://example.com/scan/pool/abc123 or /scan/banquet/abc123
+function parseTokenAndType(rawValue) {
+  const match = rawValue.match(/\/scan\/(pool|banquet|guest-pool|bowling)\/([a-f0-9]+)/i);
+  if (match) {
+    return { token: match[2], passportType: match[1].toLowerCase() };
+  }
+  return { token: rawValue.trim(), passportType: currentMode };
+}
+
+async function doScan(rawValue) {
+  if (!rawValue.trim()) return;
+  const { token, passportType } = parseTokenAndType(rawValue);
   try {
     const r = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenValue.trim(), passportType: currentMode, deviceId: 'doorman-tablet' }),
+      body: JSON.stringify({ token, passportType, deviceId: 'doorman-tablet' }),
     });
     const data = await r.json();
     showResult(data);
@@ -262,7 +282,7 @@ function showResult(data) {
   const name = document.getElementById('resultName');
   const msg = document.getElementById('resultMsg');
 
-  overlay.classList.remove('success', 'denied', 'already');
+  overlay.classList.remove('success', 'denied', 'already', 'disabled');
 
   if (data.success) {
     overlay.classList.add('success');
@@ -274,6 +294,11 @@ function showResult(data) {
     icon.textContent = '⚠️';
     name.textContent = data.bowlerName || 'Already Redeemed';
     msg.textContent = 'This pass was already used';
+  } else if (data.disabled) {
+    overlay.classList.add('disabled');
+    icon.textContent = '⛔';
+    name.textContent = 'Not Eligible';
+    msg.textContent = 'This pass has been disabled by the Event Director';
   } else {
     overlay.classList.add('denied');
     icon.textContent = '❌';
@@ -313,6 +338,9 @@ function resetInactivity() {
 document.addEventListener('touchstart', resetInactivity);
 document.addEventListener('click', resetInactivity);
 resetInactivity();
+
+// Initialize: fetch PIN length and render dots
+fetchPinLength();
 </script>
 </body>
 </html>

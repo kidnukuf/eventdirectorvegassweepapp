@@ -622,9 +622,13 @@ export default function BowlerDashboard() {
         <PassportBox
           title="Banquet Dinner Passport"
           icon="🍽️"
-          subtitle="Funtime Team Challenge 2026 — Banquet Dinner"
-          checkInTime="6:00 PM — Check-in begins at 5:30 PM"
-          entranceFlow="Present this QR code at the banquet hall entrance. A staff member will scan your code — once scanned it cannot be reused. Wristbands will be issued at the door for re-entry. If you are not on the eligible list, please see your team captain before the event begins."
+          subtitle={(p as any).eventName ? `${(p as any).eventName} — Banquet Dinner` : "Banquet Dinner"}
+          checkInTime={(p as any).banquetTime ? `${(p as any).banquetTime} — Check-in begins 30 min early` : "Check-in begins 30 minutes before dinner"}
+          entranceFlow={[
+            (p as any).banquetLocation ? `📍 Location: ${(p as any).banquetLocation}` : null,
+            (p as any).banquetTable ? `🪑 ${(p as any).banquetTable}` : null,
+            "Present this QR code at the banquet hall entrance. A staff member will scan your code — once scanned it cannot be reused. Wristbands will be issued at the door for re-entry. If you are not on the eligible list, please see your team captain before the event begins.",
+          ].filter(Boolean).join("\n")}
           qrDataUrl={p.banquetQR}
           tokenUsed={Boolean(p.banquetUsed)}
           eligible={banquetEligible}
