@@ -358,11 +358,11 @@
 - [ ] TypeScript check, push to GitHub, save checkpoint
 
 ## Phase 30: Contact Info Request Flow (Bowler → ED → Google Sheet)
-- [ ] Add contact_requests table (bowlerId, phone, email, status pending/confirmed/rejected, sheetRow, spreadsheetId, createdAt, confirmedAt)
-- [ ] Run migration SQL for contact_requests table
-- [ ] Server: bowlerAuth.submitContactRequest — validate 10-digit phone + email, insert row, send ED notification
-- [ ] Server: bowlerAuth.listContactRequests — returns all pending requests (ED only)
-- [ ] Server: bowlerAuth.confirmContactRequest — update bowler phone+email in DB, write phone to col A and email to col B in Google Sheet row, mark request confirmed
-- [ ] BowlerDashboard: replace "contact info unavailable" static text with inline form (phone + email fields, 10-digit validation, Send button, success state)
-- [ ] CaptainDashboard: same inline contact info form
-- [ ] AdminDashboard: add Contact Requests panel (Roster tab or new section) — list pending requests with bowler name, submitted phone/email, Confirm button
+- [x] Add contact_requests table (bowlerId, phone, email, status pending/confirmed/rejected, sheetRow, spreadsheetId, createdAt, confirmedAt)
+- [x] Run migration SQL for contact_requests table
+- [x] Server: bowlerAuth.submitContactRequest — validate 10-digit phone + email, insert row, send ED notification
+- [x] Server: bowlerAuth.listContactRequests — returns all pending requests (ED only)
+- [x] Server: bowlerAuth.confirmContactRequest — update bowler phone+email in DB, write phone to col A and email to col B in Google Sheet row, mark request confirmed
+- [x] BowlerDashboard: replace "contact info unavailable" static text with inline form (phone + email fields, 10-digit validation, Send button, success state)
+- [x] CaptainDashboard: same inline contact info form
+- [x] AdminDashboard: add Contact Requests panel (Roster tab or new section) — list pending requests with bowler name, submitted phone/email, Confirm button
