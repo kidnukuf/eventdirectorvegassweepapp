@@ -770,10 +770,10 @@ export const appRouter = router({
             }
             teamId = teamRows[0]?.id as number;
 
-            // Check duplicate
+            // Check duplicate — scoped to this event so same bowler in a different event creates a new record
             const existing = await rawQuery(
-              "SELECT id FROM bowlers WHERE scantronId = ? LIMIT 1",
-              [scantronId]
+              "SELECT id FROM bowlers WHERE scantronId = ? AND eventId = ? LIMIT 1",
+              [scantronId, input.eventId]
             ) as Record<string, unknown>[];
 
             // Parse hotel/payment data — 22-column B.O.B. layout (Jun 17 v2)
