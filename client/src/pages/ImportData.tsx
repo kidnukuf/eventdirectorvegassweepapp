@@ -149,6 +149,9 @@ export default function ImportData() {
   const [pastedText, setPastedText] = useState("");
   const [activeTab, setActiveTab] = useState<"file" | "google" | "paste">("file");
   const [isDragging, setIsDragging] = useState(false);
+  const [leagueCode, setLeagueCode] = useState("1");
+  const [eventCode, setEventCode] = useState("26");
+  const [idRosterRows, setIdRosterRows] = useState<{ scantronId: string; firstName: string; lastName: string; center: string; team: string; teamCode: string; position: string; leagueCode: string; eventCode: string; centerCode: string }[]>([]);
 
   // Import into the event currently selected in the Event Director dashboard.
   const [selectedEventId] = useState<number>(() => {
@@ -158,10 +161,40 @@ export default function ImportData() {
   const { data: events = [] } = trpc.event.list.useQuery();
   const selectedEvent = (events as Record<string, unknown>[]).find((e) => Number(e.id) === selectedEventId) ?? null;
 
+  const adminRosterQuery = trpc.bowlers.adminList.useQuery(
+    { eventId: selectedEventId },
+    { enabled: false }
+  );
+
   const importMutation = trpc.import.process.useMutation({
-    onSuccess: (data: unknown) => {
+    onSuccess: async (data: unknown) => {
       const d = data as { imported: number; updated: number; errors: number; generatedIds: string[] };
       setImportResult({ imported: d.imported ?? 0, updated: d.updated ?? 0, errors: d.errors ?? 0, generatedIds: d.generatedIds ?? [] });
+      // Fetch the full roster to build the ID reference sheet
+      const roster = await adminRosterQuery.refetch();
+      if (roster.data) {
+        const rows = (roster.data as Record<string, unknown>[]).map(b => {
+          const sid = String(b.scantronId ?? "");
+          const cc = sid.slice(0, 2);
+          const l = sid.slice(2, 3);
+          const ee = sid.slice(3, 5);
+          const tt = sid.slice(5, 7);
+          const bb = sid.slice(7, 9);
+          return {
+            scantronId: sid,
+            firstName: String(b.legalFirstName ?? ""),
+            lastName: String(b.legalLastName ?? ""),
+            center: String(b.centerName ?? ""),
+            team: String(b.teamName ?? ""),
+            teamCode: tt,
+            position: bb,
+            leagueCode: l,
+            eventCode: ee,
+            centerCode: cc,
+          };
+        });
+        setIdRosterRows(rows);
+      }
       setStep("done");
       const total = (d.imported ?? 0) + (d.updated ?? 0);
       toast.success(`\u2705 Imported ${d.imported ?? 0} new, updated ${d.updated ?? 0} (${total} total)!`);
@@ -217,7 +250,7 @@ export default function ImportData() {
     if (validRows.length === 0) { toast.error("No valid rows to import."); return; }
     // Send the RAW row data keyed by original headers so the server's header-based lookups work
     const rawRows = validRows.map(r => r.raw);
-    importMutation.mutate({ rows: rawRows as unknown as Record<string, unknown>[], eventId: selectedEventId, sourceType: activeTab === "google" ? "google_sheets" : activeTab === "paste" ? "paste" : "csv", sourceName: activeTab === "file" ? "uploaded file" : activeTab === "google" ? googleUrl : "pasted data" });
+    importMutation.mutate({ rows: rawRows as unknown as Record<string, unknown>[], eventId: selectedEventId, sourceType: activeTab === "google" ? "google_sheets" : activeTab === "paste" ? "paste" : "csv", sourceName: activeTab === "file" ? "uploaded file" : activeTab === "google" ? googleUrl : "pasted data", leagueCode, eventCode });
   };
 
   const errorCount = parsedRows.filter(r => r.errors.length > 0).length;
@@ -254,6 +287,53 @@ export default function ImportData() {
                 <li>Each bowler gets a unique 10-digit scantron ID generated automatically</li>
                 <li>Bowlers can then sign up and claim their pre-generated record</li>
               </ol>
+            </div>
+
+            {/* League Code + Event Code Inputs */}
+            <div className="neon-card p-5 border-yellow-500/30">
+              <h2 className="text-yellow-400 font-bold text-lg mb-1">🔢 ID Generation Settings</h2>
+              <p className="text-gray-400 text-xs mb-4">These two values are baked into every bowler's 10-digit scantron ID. Set them before importing — they cannot be changed after.</p>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">League Code <span className="text-yellow-500">(1 digit)</span></label>
+                  <input
+                    type="text" maxLength={1} value={leagueCode}
+                    onChange={e => setLeagueCode(e.target.value.replace(/\D/g, "").slice(0, 1))}
+                    className="w-full bg-[#111] border border-yellow-500/30 rounded-lg px-3 py-2 text-yellow-300 font-mono text-lg text-center focus:outline-none focus:border-yellow-500"
+                    placeholder="1"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">e.g. 1 = Funtime 1, 2 = Funtime 2</p>
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1">Event Year Code <span className="text-yellow-500">(2 digits)</span></label>
+                  <input
+                    type="text" maxLength={2} value={eventCode}
+                    onChange={e => setEventCode(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className="w-full bg-[#111] border border-yellow-500/30 rounded-lg px-3 py-2 text-yellow-300 font-mono text-lg text-center focus:outline-none focus:border-yellow-500"
+                    placeholder="26"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">e.g. 26 = 2026, 27 = 2027</p>
+                </div>
+              </div>
+              {/* ID Formula Decoder */}
+              <div className="bg-[#0a0a0a] rounded-xl p-4 border border-white/5">
+                <p className="text-gray-400 text-xs font-semibold mb-3 tracking-widest">HOW THE 10-DIGIT ID IS BUILT</p>
+                <div className="font-mono text-sm mb-3 flex flex-wrap gap-0 items-center">
+                  <span className="bg-cyan-900/40 border border-cyan-500/40 text-cyan-300 px-2 py-1 rounded-l">{leagueCode ? leagueCode.padStart(1,"0") : "?"}{leagueCode ? leagueCode.padStart(1,"0") : "?"}</span>
+                  <span className="bg-purple-900/40 border border-purple-500/40 text-purple-300 px-2 py-1">{leagueCode || "?"}</span>
+                  <span className="bg-green-900/40 border border-green-500/40 text-green-300 px-2 py-1">{eventCode ? eventCode.padStart(2,"0") : "??"}</span>
+                  <span className="bg-orange-900/40 border border-orange-500/40 text-orange-300 px-2 py-1">TT</span>
+                  <span className="bg-red-900/40 border border-red-500/40 text-red-300 px-2 py-1 rounded-r">BB</span>
+                </div>
+                <div className="grid grid-cols-5 gap-2 text-xs">
+                  <div className="text-center"><div className="text-cyan-400 font-bold">CC</div><div className="text-gray-500">Center Code</div><div className="text-gray-600 text-[10px]">2 digits</div></div>
+                  <div className="text-center"><div className="text-purple-400 font-bold">L</div><div className="text-gray-500">League #</div><div className="text-gray-600 text-[10px]">1 digit</div></div>
+                  <div className="text-center"><div className="text-green-400 font-bold">EE</div><div className="text-gray-500">Event Year</div><div className="text-gray-600 text-[10px]">2 digits</div></div>
+                  <div className="text-center"><div className="text-orange-400 font-bold">TT</div><div className="text-gray-500">Team #</div><div className="text-gray-600 text-[10px]">2 digits</div></div>
+                  <div className="text-center"><div className="text-red-400 font-bold">BB</div><div className="text-gray-500">Bowler Pos</div><div className="text-gray-600 text-[10px]">2 digits</div></div>
+                </div>
+                <p className="text-gray-600 text-xs mt-3">Example: <span className="font-mono text-yellow-400">03</span><span className="font-mono text-purple-400">1</span><span className="font-mono text-green-400">26</span><span className="font-mono text-orange-400">07</span><span className="font-mono text-red-400">02</span> = Center 03, League 1, Year 2026, Team 7, Bowler #2</p>
+              </div>
             </div>
 
             {/* Tab Selector */}
@@ -417,41 +497,118 @@ export default function ImportData() {
         )}
 
         {step === "done" && importResult && (
-          <div className="space-y-6 text-center">
-            <div className="neon-card p-10">
+          <div className="space-y-6">
+            {/* Success Header */}
+            <div className="neon-card p-8 text-center">
               <div className="text-6xl mb-4">🎳</div>
-              <h2 className="text-3xl font-black text-yellow-400 mb-2" style={{ textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>
-                Import Complete!
-              </h2>
-              <div className="grid grid-cols-2 gap-4 mt-6 mb-6">
+              <h2 className="text-3xl font-black text-yellow-400 mb-2" style={{ textShadow: "0 0 20px rgba(255,215,0,0.5)" }}>Import Complete!</h2>
+              <div className="grid grid-cols-3 gap-4 mt-6">
                 <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
                   <div className="text-3xl font-black text-green-400">{importResult.imported}</div>
-                  <div className="text-gray-400 text-sm">Bowlers Imported</div>
+                  <div className="text-gray-400 text-sm">New Bowlers</div>
+                </div>
+                <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+                  <div className="text-3xl font-black text-blue-400">{(importResult as {updated?:number}).updated ?? 0}</div>
+                  <div className="text-gray-400 text-sm">Updated</div>
                 </div>
                 <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
                   <div className="text-3xl font-black text-red-400">{importResult.errors}</div>
-                  <div className="text-gray-400 text-sm">Rows Skipped</div>
+                  <div className="text-gray-400 text-sm">Skipped</div>
                 </div>
               </div>
-              {importResult.generatedIds.length > 0 && (
-                <div className="bg-[#111] rounded-xl p-4 text-left mb-6">
-                  <p className="text-gray-400 text-xs mb-2 font-semibold">SAMPLE GENERATED IDs:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {importResult.generatedIds.slice(0, 10).map(id => (
-                      <span key={id} className="font-mono text-xs bg-yellow-900/30 text-yellow-400 border border-yellow-500/30 rounded px-2 py-1">{id}</span>
-                    ))}
-                    {importResult.generatedIds.length > 10 && <span className="text-gray-500 text-xs">+{importResult.generatedIds.length - 10} more</span>}
+            </div>
+
+            {/* ID Reference Sheet */}
+            {idRosterRows.length > 0 && (
+              <div className="neon-card p-5 border-yellow-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-yellow-400 font-bold text-lg">🔢 Bowler ID Reference Sheet</h3>
+                    <p className="text-gray-500 text-xs mt-0.5">{idRosterRows.length} bowlers — each 10-digit ID is unique and permanent</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const header = "Scantron ID,First Name,Last Name,Center,Team,CC,L,EE,TT,BB";
+                        const rows = idRosterRows.map(r =>
+                          `${r.scantronId},${r.firstName},${r.lastName},"${r.center}","${r.team}",${r.centerCode},${r.leagueCode},${r.eventCode},${r.teamCode},${r.position}`
+                        ).join("\n");
+                        const blob = new Blob([header + "\n" + rows], { type: "text/csv" });
+                        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+                        a.download = "BowlerIDs_Reference.csv"; a.click();
+                      }}
+                      className="neon-btn-gold text-xs px-3 py-1.5">
+                      ⬇️ Download CSV
+                    </button>
+                    <button
+                      onClick={() => {
+                        const text = idRosterRows.map(r =>
+                          `${r.scantronId}\t${r.firstName} ${r.lastName}\t${r.center}\t${r.team}`
+                        ).join("\n");
+                        navigator.clipboard.writeText(text).then(() => toast.success("📋 Copied to clipboard!"));
+                      }}
+                      className="neon-btn-cyan text-xs px-3 py-1.5">
+                      📋 Copy All
+                    </button>
                   </div>
                 </div>
-              )}
-              <div className="flex gap-3">
-                <button onClick={() => { setStep("upload"); setImportResult(null); setParsedRows([]); }} className="neon-btn-cyan flex-1 py-3">
-                  Import More
-                </button>
-                <button onClick={() => navigate("/admin")} className="neon-btn-gold flex-[2] py-3">
-                  → View Admin Dashboard
-                </button>
+
+                {/* ID Decoder Legend */}
+                <div className="bg-[#0a0a0a] rounded-xl p-3 mb-4 border border-white/5">
+                  <p className="text-gray-500 text-[10px] font-semibold tracking-widest mb-2">ID SEGMENT DECODER</p>
+                  <div className="flex flex-wrap gap-3 text-xs">
+                    <span><span className="font-mono text-cyan-400 font-bold">CC</span> <span className="text-gray-500">=</span> <span className="text-gray-300">Center Code (2 digits) — which bowling center</span></span>
+                    <span><span className="font-mono text-purple-400 font-bold">L</span> <span className="text-gray-500">=</span> <span className="text-gray-300">League Number (1 digit) — e.g. 1 = Funtime 1</span></span>
+                    <span><span className="font-mono text-green-400 font-bold">EE</span> <span className="text-gray-500">=</span> <span className="text-gray-300">Event Year (2 digits) — e.g. 26 = 2026</span></span>
+                    <span><span className="font-mono text-orange-400 font-bold">TT</span> <span className="text-gray-500">=</span> <span className="text-gray-300">Team Number (2 digits) — padded, e.g. 07</span></span>
+                    <span><span className="font-mono text-red-400 font-bold">BB</span> <span className="text-gray-500">=</span> <span className="text-gray-300">Bowler Position (2 digits) — order within team at that center</span></span>
+                  </div>
+                </div>
+
+                {/* ID Table */}
+                <div className="overflow-auto max-h-96 rounded-xl border border-white/10">
+                  <table className="w-full text-sm">
+                    <thead className="bg-[#111] sticky top-0">
+                      <tr className="text-left">
+                        <th className="px-3 py-2 text-yellow-400 font-mono text-xs">Scantron ID</th>
+                        <th className="px-3 py-2 text-gray-400 text-xs">Name</th>
+                        <th className="px-3 py-2 text-gray-400 text-xs">Center</th>
+                        <th className="px-3 py-2 text-gray-400 text-xs">Team</th>
+                        <th className="px-3 py-2 text-cyan-400 font-mono text-xs">CC</th>
+                        <th className="px-3 py-2 text-purple-400 font-mono text-xs">L</th>
+                        <th className="px-3 py-2 text-green-400 font-mono text-xs">EE</th>
+                        <th className="px-3 py-2 text-orange-400 font-mono text-xs">TT</th>
+                        <th className="px-3 py-2 text-red-400 font-mono text-xs">BB</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {idRosterRows.map((r, i) => (
+                        <tr key={r.scantronId} className={`border-t border-white/5 ${i % 2 === 0 ? "bg-[#0d0d0d]" : "bg-[#111]"}`}>
+                          <td className="px-3 py-2 font-mono text-yellow-400 text-xs tracking-widest">{r.scantronId}</td>
+                          <td className="px-3 py-2 text-white font-semibold text-xs">{r.firstName} {r.lastName}</td>
+                          <td className="px-3 py-2 text-gray-400 text-xs">{r.center}</td>
+                          <td className="px-3 py-2 text-gray-400 text-xs">{r.team}</td>
+                          <td className="px-3 py-2 font-mono text-cyan-400 text-xs">{r.centerCode}</td>
+                          <td className="px-3 py-2 font-mono text-purple-400 text-xs">{r.leagueCode}</td>
+                          <td className="px-3 py-2 font-mono text-green-400 text-xs">{r.eventCode}</td>
+                          <td className="px-3 py-2 font-mono text-orange-400 text-xs">{r.teamCode}</td>
+                          <td className="px-3 py-2 font-mono text-red-400 text-xs">{r.position}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-3">
+              <button onClick={() => { setStep("upload"); setImportResult(null); setParsedRows([]); setIdRosterRows([]); }} className="neon-btn-cyan flex-1 py-3">
+                Import More
+              </button>
+              <button onClick={() => navigate("/admin")} className="neon-btn-gold flex-[2] py-3">
+                → View Admin Dashboard
+              </button>
             </div>
           </div>
         )}
