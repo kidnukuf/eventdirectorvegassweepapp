@@ -378,3 +378,12 @@
 - [x] Build confirmation grid: color-coded by league (19 league colors), bowler name + seat code + original row number
 - [x] Build output panel: single column XX-O format (e.g. 04-H), copy-paste ready, rows match original upload order
 - [x] TypeScript check, push to GitHub, save checkpoint
+
+## Phase 32: Missing-Phone Popup (Bowler Portal)
+- [x] Add Dialog import to BowlerDashboard.tsx
+- [x] Add popup state (popupOpen, popupPhone, popupEmail) to BowlerDashboard
+- [x] useEffect fires popup after profile loads when phone is absent and session hasn't dismissed it
+- [x] Popup reuses submitContactRequest mutation (same as inline form)
+- [x] "Remind me later" button dismisses popup and sets sessionStorage flag so it doesn't re-appear in same session
+- [x] On successful submit, popup closes and shows success toast; contactSent flag prevents re-trigger
+- [x] TypeScript clean (0 errors), save checkpoint

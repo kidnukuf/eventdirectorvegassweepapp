@@ -18,6 +18,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession, BOWLER_IS_CAPTAIN_KEY } from "./BowlerLogin";
 import { normalizeSquadTime } from "@/lib/squadTime";
@@ -474,9 +475,36 @@ export default function BowlerDashboard() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactSent, setContactSent] = useState(false);
   const submitContactRequest = trpc.bowlerAuth.submitContactRequest.useMutation({
-    onSuccess: () => { setContactSent(true); setContactFormOpen(false); toast.success("Contact info submitted! The Event Director will review and confirm it shortly."); },
+    onSuccess: () => { setContactSent(true); setContactFormOpen(false); setPopupOpen(false); toast.success("Contact info submitted! The Event Director will review and confirm it shortly."); },
     onError: (e) => toast.error(e.message),
   });
+
+  // Missing-phone popup — shown once per session when phone is absent and no request already sent
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupPhone, setPopupPhone] = useState("");
+  const [popupEmail, setPopupEmail] = useState("");
+
+  // Fire popup after profile loads if phone is missing and user hasn't already submitted
+  useEffect(() => {
+    if (!profileQuery.data) return;
+    const p = profileQuery.data;
+    const alreadyDismissed = sessionStorage.getItem("contact_popup_dismissed") === "1";
+    const hasPhone = !!(p as any).phone;
+    if (!hasPhone && !alreadyDismissed && !contactSent) {
+      setPopupOpen(true);
+    }
+  }, [profileQuery.data, contactSent]);
+
+  function handlePopupDismiss() {
+    sessionStorage.setItem("contact_popup_dismissed", "1");
+    setPopupOpen(false);
+  }
+
+  function handlePopupSubmit() {
+    const token = getBowlerToken();
+    if (!token) return;
+    submitContactRequest.mutate({ token, phone: popupPhone, email: popupEmail });
+  }
 
   function handleLogout() {
     clearBowlerSession();
@@ -517,6 +545,72 @@ export default function BowlerDashboard() {
 
   return (
     <div className="bowler-portal-bg min-h-screen flex flex-col">
+
+      {/* ── Missing-phone popup ── */}
+      <Dialog open={popupOpen} onOpenChange={(open) => { if (!open) handlePopupDismiss(); }}>
+        <DialogContent className="bg-zinc-900 border border-amber-500/40 text-white max-w-sm mx-auto rounded-2xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-amber-300 text-lg font-extrabold flex items-center gap-2">
+              📱 Add Your Contact Info
+            </DialogTitle>
+            <DialogDescription className="text-white/70 text-sm leading-relaxed">
+              We don't have a phone number on file for you yet. Add it now so the Event Director can reach you with important updates.
+            </DialogDescription>
+          </DialogHeader>
+
+          {contactSent ? (
+            <div className="py-4 text-center">
+              <p className="text-emerald-400 font-semibold text-base">✅ Submitted! The Event Director will confirm your info shortly.</p>
+              <Button className="mt-4 bowler-btn-secondary w-full" onClick={handlePopupDismiss}>Close</Button>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              <div>
+                <label className="text-white/60 text-xs mb-1 block">Phone Number (10 digits)</label>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="e.g. 7025551234"
+                  value={popupPhone}
+                  onChange={(e) => setPopupPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-lg text-white text-sm font-mono focus:outline-none focus:border-amber-400"
+                />
+              </div>
+              <div>
+                <label className="text-white/60 text-xs mb-1 block">Email Address</label>
+                <input
+                  type="email"
+                  placeholder="e.g. you@example.com"
+                  value={popupEmail}
+                  onChange={(e) => setPopupEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-black/40 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-amber-400"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  className="bowler-btn-primary flex-1"
+                  disabled={popupPhone.length !== 10 || !popupEmail.includes("@") || submitContactRequest.isPending}
+                  onClick={handlePopupSubmit}
+                >
+                  {submitContactRequest.isPending ? "Sending…" : "📤 Send"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-white/20 text-white/70 hover:text-white"
+                  onClick={handlePopupDismiss}
+                >
+                  Remind me later
+                </Button>
+              </div>
+              <p className="text-white/40 text-xs text-center">
+                Your info will be reviewed by the Event Director before it's saved.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ── Header ── */}
       <header className="bowler-portal-header px-4 py-3 flex items-center justify-between">
         {(() => {
