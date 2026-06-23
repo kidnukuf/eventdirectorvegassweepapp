@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession } from "./BowlerLogin";
 import { normalizeSquadTime } from "@/lib/squadTime";
 import { detectGroupSlug, GROUP_THEMES } from "@/lib/eventGroup";
+import AppFooter from "@/components/AppFooter";
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 function downloadQR(dataUrl: string, filename: string) {
@@ -755,6 +756,8 @@ export default function CaptainDashboard() {
         </div>
 
       </div>
+
+      <AppFooter />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   setJuneGroupNumber,
   GROUP_THEMES,
 } from "@/lib/eventGroup";
+import AppFooter from "@/components/AppFooter";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -308,6 +309,8 @@ export default function Home() {
           </p>
         </div>
       </div>
+
+      <AppFooter dark />
     </div>
   );
 }

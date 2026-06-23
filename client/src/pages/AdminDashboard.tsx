@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AppFooter from "@/components/AppFooter";
 
 // ─── Local storage key for ED session ────────────────────────────────────────
 const ED_TOKEN_KEY = "vsn_ed_token";
@@ -1744,6 +1745,8 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
           </div>
         </div>
       )}
+
+      <AppFooter dark />
     </div>
   );
 }

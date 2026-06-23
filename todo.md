@@ -393,3 +393,9 @@
 - [x] Add PwaInstallPrompt banner component to BowlerDashboard above Lane→Banquet accordion
 - [x] Seating Chart algorithm tested: 8 test suites all pass (ID parsing, balanced table sizes, full 55-bowler run, tab/CSV input, 450-bowler large dataset, center isolation, guest adjacency, output format XX-L)
 - [x] TypeScript clean (0 errors), save checkpoint, push to GitHub
+
+## Phase 34: Copyright & Legal Footer
+- [x] Create shared AppFooter component with 2026 copyright, disclaimer, privacy, and terms statements
+- [x] Add AppFooter to all public-facing pages: Home, BowlerLogin, BowlerDashboard, BowlerConfirmation, CaptainLogin, CaptainDashboard
+- [x] Add AppFooter to ED portal pages: AdminDashboard (EventDirectorDashboard)
+- [ ] Save checkpoint and publish

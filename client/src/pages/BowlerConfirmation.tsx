@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { normalizeSquadTime } from "@/lib/squadTime";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
+import AppFooter from "@/components/AppFooter";
 
 // ─── PWA install popup types ──────────────────────────────────────────────────
 interface BeforeInstallPromptEvent extends Event {
@@ -421,6 +422,8 @@ function PassportStep({ profile, onDone }: { profile: any; onDone: () => void })
           Go to My Dashboard →
         </Button>
       </div>
+
+      <AppFooter />
     </div>
   );
 }

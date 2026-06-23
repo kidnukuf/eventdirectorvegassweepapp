@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { detectGroupSlug, GROUP_THEMES } from "@/lib/eventGroup";
+import AppFooter from "@/components/AppFooter";
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string;
 
@@ -416,6 +417,8 @@ export default function CaptainLogin() {
           </div>
         </div>
       </div>
+
+      <AppFooter />
     </div>
   );
 }

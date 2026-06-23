@@ -24,6 +24,7 @@ import { getBowlerToken, clearBowlerSession, BOWLER_IS_CAPTAIN_KEY } from "./Bow
 import { normalizeSquadTime } from "@/lib/squadTime";
 import { detectGroupSlug, GROUP_THEMES } from "@/lib/eventGroup";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
+import AppFooter from "@/components/AppFooter";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -870,6 +871,8 @@ export default function BowlerDashboard() {
         {/* Bottom spacer */}
         <div className="h-8" />
       </div>
+
+      <AppFooter />
     </div>
   );
 }
