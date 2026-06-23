@@ -44,6 +44,29 @@ export default function BowlerLogin() {
   // ED contact popup state
   const [showEdContact, setShowEdContact] = useState(false);
   const [loginErrorMsg, setLoginErrorMsg] = useState("");
+  const [supportName, setSupportName] = useState("");
+  const [supportCenter, setSupportCenter] = useState("");
+  const [supportContact, setSupportContact] = useState("");
+  const [supportMsg, setSupportMsg] = useState("");
+  const [supportSent, setSupportSent] = useState(false);
+
+  const submitSupport = trpc.support.submit.useMutation({
+    onSuccess: () => setSupportSent(true),
+    onError: (err) => toast.error(err.message),
+  });
+
+  function handleSupportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supportName || !supportCenter || !supportContact || !supportMsg)
+      return toast.error("Please fill in all fields.");
+    submitSupport.mutate({
+      bowlerName: supportName.trim(),
+      bowlerCenter: supportCenter.trim(),
+      contactInfo: supportContact.trim(),
+      message: supportMsg.trim(),
+      errorMsg: loginErrorMsg || undefined,
+    });
+  }
 
   // Sign-in state
   const [siFirst, setSiFirst] = useState("");
@@ -402,37 +425,88 @@ export default function BowlerLogin() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-1">
-            {loginErrorMsg && (
-              <div className="rounded-xl px-4 py-3 text-sm text-red-300 font-medium"
-                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                {loginErrorMsg}
+            {supportSent ? (
+              <div className="text-center py-6">
+                <div className="text-5xl mb-4">✅</div>
+                <h3 className="text-white font-black text-lg mb-2">Message Sent!</h3>
+                <p className="text-white/70 text-sm leading-relaxed mb-4">
+                  Your message has been sent to the Event Director.
+                  Cassie will reach out to you using the contact info you provided.
+                </p>
+                <button
+                  onClick={() => { setShowEdContact(false); setSupportSent(false); }}
+                  className="px-6 py-2.5 rounded-xl font-bold text-black text-sm"
+                  style={{ background: "linear-gradient(135deg, #ffd700, #f59e0b)" }}
+                >
+                  Back to Sign In
+                </button>
               </div>
+            ) : (
+              <>
+                {loginErrorMsg && (
+                  <div className="rounded-xl px-4 py-3 text-sm text-red-300 font-medium"
+                    style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                    {loginErrorMsg}
+                  </div>
+                )}
+                <p className="text-white/75 text-sm leading-relaxed">
+                  Your name or bowling center may not match the roster exactly.
+                  Fill out the form below and the Event Director will get back to you.
+                </p>
+                <form onSubmit={handleSupportSubmit} className="space-y-3">
+                  <div>
+                    <Label className="bowler-label text-xs">Your Full Name</Label>
+                    <Input
+                      className="bowler-input text-sm"
+                      placeholder="First Last"
+                      value={supportName}
+                      onChange={(e) => setSupportName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="bowler-label text-xs">Your Bowling Center</Label>
+                    <Input
+                      className="bowler-input text-sm"
+                      placeholder="e.g. Sunset Lanes"
+                      value={supportCenter}
+                      onChange={(e) => setSupportCenter(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="bowler-label text-xs">Your Phone or Email</Label>
+                    <Input
+                      className="bowler-input text-sm"
+                      placeholder="So Cassie can reach you"
+                      value={supportContact}
+                      onChange={(e) => setSupportContact(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="bowler-label text-xs">Message</Label>
+                    <textarea
+                      className="bowler-input w-full text-sm resize-none"
+                      rows={3}
+                      placeholder="Describe your issue..."
+                      value={supportMsg}
+                      onChange={(e) => setSupportMsg(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={submitSupport.isPending}
+                    className="bowler-btn-primary w-full text-sm"
+                  >
+                    {submitSupport.isPending ? "Sending…" : "📨 Send to Event Director"}
+                  </Button>
+                </form>
+                <button
+                  onClick={() => setShowEdContact(false)}
+                  className="w-full py-2 rounded-xl text-white/40 text-xs font-medium transition-colors hover:text-white/70"
+                >
+                  Try Again
+                </button>
+              </>
             )}
-            <p className="text-white/75 text-sm leading-relaxed">
-              Your name or bowling center may not match the event roster exactly.
-              Please double-check your spelling and try again, or contact your
-              Event Director for help.
-            </p>
-            <div className="rounded-2xl p-4 text-center"
-              style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.25)" }}>
-              <p className="text-white/60 text-xs font-semibold tracking-widest uppercase mb-2">Event Director</p>
-              <p className="text-white font-bold text-base mb-3">Cassie Davis</p>
-              <a
-                href="mailto:CaDavis@LSEnt.com?subject=B.O.B.%20Roll-off%20Passport%20%E2%80%94%20Sign-In%20Help&body=Hi%20Cassie%2C%0A%0AI%20am%20having%20trouble%20signing%20in%20to%20the%20B.O.B.%20Roll-off%20Passport.%0A%0AName%3A%20%0ABowling%20Center%3A%20%0AError%20message%3A%20"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-black text-sm transition-all duration-200 active:scale-95"
-                style={{ background: "linear-gradient(135deg, #ffd700, #f59e0b)", boxShadow: "0 0 20px rgba(255,215,0,0.3)" }}
-                onClick={() => setShowEdContact(false)}
-              >
-                <span className="text-lg">✉️</span>
-                Email CaDavis@LSEnt.com
-              </a>
-            </div>
-            <button
-              onClick={() => setShowEdContact(false)}
-              className="w-full py-2.5 rounded-xl text-white/60 text-sm font-medium transition-colors hover:text-white hover:bg-white/5"
-            >
-              Try Again
-            </button>
           </div>
         </DialogContent>
       </Dialog>

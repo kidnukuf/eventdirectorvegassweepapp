@@ -399,3 +399,11 @@
 - [x] Add AppFooter to all public-facing pages: Home, BowlerLogin, BowlerDashboard, BowlerConfirmation, CaptainLogin, CaptainDashboard
 - [x] Add AppFooter to ED portal pages: AdminDashboard (EventDirectorDashboard)
 - [x] Save checkpoint and publish
+
+## Phase 37: Bowler Support Inbox (Login Help Form → ED Portal)
+- [x] Add support_messages table to drizzle schema (id, bowlerName, bowlerCenter, message, errorMsg, status, createdAt, edReply, repliedAt)
+- [x] Add tRPC procedures: support.submit (public), support.list (ED), support.reply (ED)
+- [x] Replace SMS button in BowlerLogin popup with inline contact form (name, center, message)
+- [x] Add Support Inbox tab/section in AdminDashboard ED portal with message list and reply UI
+- [x] Wire ED reply to send notifyOwner notification to Cassie
+- [x] Save checkpoint, push to GitHub

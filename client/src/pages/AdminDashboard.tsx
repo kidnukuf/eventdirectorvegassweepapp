@@ -366,7 +366,10 @@ function PassportManager({
 function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest" | "unmatched" | "passports" | "scan">("roster");
+  const [activeTab, setActiveTab] = useState<"roster" | "audit" | "doormen" | "qrtest" | "unmatched" | "passports" | "scan" | "support">("roster");
+  // Support Inbox
+  const [supportReplyId, setSupportReplyId] = useState<number | null>(null);
+  const [supportReplyText, setSupportReplyText] = useState("");
   const [passportSearch, setPassportSearch] = useState("");
   const [passportFilter, setPassportFilter] = useState<"all" | "redeemed" | "pending" | "disabled">("all");
   const [editingBowler, setEditingBowler] = useState<Bowler | null>(null);
@@ -649,6 +652,13 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
   });
 
   // Contact requests: list + confirm
+  const { data: supportMessages = [], refetch: refetchSupportMessages } = trpc.support.list.useQuery(undefined, { refetchInterval: 30000 });
+  const markSupportRead = trpc.support.markRead.useMutation({ onSuccess: () => refetchSupportMessages() });
+  const replySupportMut = trpc.support.reply.useMutation({
+    onSuccess: () => { toast.success("Reply recorded!"); setSupportReplyId(null); setSupportReplyText(""); refetchSupportMessages(); },
+    onError: (err) => toast.error(err.message),
+  });
+
   const { data: contactRequests = [], refetch: refetchContactRequests } = trpc.bowlerAuth.listContactRequests.useQuery(
     { token: edToken, eventId: EVENT_ID },
     { enabled: !!edToken && EVENT_ID > 0 }
@@ -884,12 +894,20 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
 
       <div className="bg-[#111] border-b border-white/10 px-4">
         <div className="max-w-7xl mx-auto flex gap-1">
-          {(["roster", "passports", "doormen", "scan", "qrtest", "audit", "unmatched"] as const).map((tab) => (
-            <button key={tab} onClick={() => { setActiveTab(tab); setAdminScanResult(null); stopAdminScanner(); }}
-              className={`px-4 py-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
-              {tab === "qrtest" ? "QR Test" : tab === "unmatched" ? `Unmatched${unmatchedBowlers.length > 0 ? ` (${unmatchedBowlers.length})` : ""}` : tab === "passports" ? "🎫 Passports" : tab === "scan" ? "📷 Scan" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
+          {(["roster", "passports", "doormen", "scan", "qrtest", "audit", "unmatched", "support"] as const).map((tab) => {
+            const newCount = tab === "support" ? (supportMessages as any[]).filter((m: any) => m.status === "new").length : 0;
+            return (
+              <button key={tab} onClick={() => { setActiveTab(tab); setAdminScanResult(null); stopAdminScanner(); }}
+                className={`px-4 py-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
+                {tab === "qrtest" ? "QR Test"
+                  : tab === "unmatched" ? `Unmatched${unmatchedBowlers.length > 0 ? ` (${unmatchedBowlers.length})` : ""}`
+                  : tab === "passports" ? "🎫 Passports"
+                  : tab === "scan" ? "📷 Scan"
+                  : tab === "support" ? `📨 Support${newCount > 0 ? ` (${newCount})` : ""}`
+                  : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1743,6 +1761,107 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
               <button onClick={() => setEventModal(null)} className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Support Inbox Tab ── */}
+      {activeTab === "support" && (
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-yellow-400">📨 Bowler Support Inbox</h2>
+            <button onClick={() => refetchSupportMessages()} className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 transition-colors">
+              ↻ Refresh
+            </button>
+          </div>
+          {(supportMessages as any[]).length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <div className="text-5xl mb-3">📥</div>
+              <p className="text-lg font-semibold">No messages yet</p>
+              <p className="text-sm mt-1">Bowler login-help requests will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {(supportMessages as any[]).map((msg: any) => (
+                <div key={msg.id}
+                  className={`rounded-2xl border p-5 transition-all ${
+                    msg.status === "new"
+                      ? "border-yellow-500/50 bg-yellow-500/5"
+                      : msg.status === "replied"
+                      ? "border-green-500/30 bg-green-500/5"
+                      : "border-white/10 bg-white/3"
+                  }`}
+                  onMouseEnter={() => { if (msg.status === "new") markSupportRead.mutate({ id: msg.id }); }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-black text-white text-base">{msg.bowlerName}</span>
+                        <span className="text-white/40 text-xs">•</span>
+                        <span className="text-white/60 text-sm">{msg.bowlerCenter}</span>
+                        {msg.status === "new" && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500 text-black">NEW</span>
+                        )}
+                        {msg.status === "replied" && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-500 text-black">✓ Replied</span>
+                        )}
+                      </div>
+                      <div className="text-amber-300 text-sm font-semibold mb-2">📞 {msg.contactInfo}</div>
+                      {msg.errorMsg && (
+                        <div className="text-red-300/80 text-xs mb-2 italic">Error: {msg.errorMsg}</div>
+                      )}
+                      <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                      {msg.edReply && (
+                        <div className="mt-3 rounded-xl px-4 py-3 text-sm text-green-300"
+                          style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                          <span className="font-bold text-green-400 text-xs uppercase tracking-wider">Your Reply: </span>
+                          {msg.edReply}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-white/30 text-xs">{new Date(msg.createdAt).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  {/* Reply area */}
+                  {supportReplyId === msg.id ? (
+                    <div className="mt-4 space-y-2">
+                      <textarea
+                        className="w-full bg-black/40 border border-white/20 rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-yellow-400"
+                        rows={3}
+                        placeholder="Type your reply to the bowler..."
+                        value={supportReplyText}
+                        onChange={(e) => setSupportReplyText(e.target.value)}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => replySupportMut.mutate({ id: msg.id, reply: supportReplyText })}
+                          disabled={replySupportMut.isPending || !supportReplyText.trim()}
+                          className="px-5 py-2 rounded-xl font-bold text-black text-sm disabled:opacity-50 transition-all"
+                          style={{ background: "linear-gradient(135deg, #ffd700, #f59e0b)" }}
+                        >
+                          {replySupportMut.isPending ? "Saving…" : "📨 Save Reply"}
+                        </button>
+                        <button
+                          onClick={() => { setSupportReplyId(null); setSupportReplyText(""); }}
+                          className="px-4 py-2 rounded-xl text-white/50 text-sm hover:text-white hover:bg-white/5 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setSupportReplyId(msg.id); setSupportReplyText(msg.edReply ?? ""); }}
+                      className="mt-3 text-xs text-yellow-400/70 hover:text-yellow-400 font-semibold transition-colors"
+                    >
+                      {msg.edReply ? "✏️ Edit Reply" : "↩️ Reply to Bowler"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

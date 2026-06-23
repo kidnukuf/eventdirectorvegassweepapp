@@ -400,3 +400,18 @@ export const contactRequests = mysqlTable("contact_requests", {
 });
 
 export type ContactRequest = typeof contactRequests.$inferSelect;
+
+// ─── SUPPORT MESSAGES (bowler login-help form → ED inbox) ────────────────────
+export const supportMessages = mysqlTable("support_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  bowlerName: varchar("bowlerName", { length: 255 }).notNull(),
+  bowlerCenter: varchar("bowlerCenter", { length: 255 }).notNull(),
+  contactInfo: varchar("contactInfo", { length: 255 }).notNull(), // phone or email provided by bowler
+  message: text("message").notNull(),
+  errorMsg: text("errorMsg"),
+  status: mysqlEnum("status", ["new", "read", "replied"]).default("new").notNull(),
+  edReply: text("edReply"),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull().default(0),
+  repliedAt: bigint("repliedAt", { mode: "number" }),
+});
+export type SupportMessage = typeof supportMessages.$inferSelect;

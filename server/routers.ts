@@ -1125,6 +1125,61 @@ export const appRouter = router({
         return { success: true, synced, skipped, total: input.redemptions.length };
       }),
   }),
-});
+  // ─── SUPPORT MESSAGES (bowler login-help form → ED inbox) ──────────────────
+  support: router({
+    submit: publicProcedure
+      .input(z.object({
+        bowlerName: z.string().min(1).max(255),
+        bowlerCenter: z.string().min(1).max(255),
+        contactInfo: z.string().min(1).max(255),
+        message: z.string().min(1).max(2000),
+        errorMsg: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await rawQuery(
+          'INSERT INTO support_messages (bowlerName, bowlerCenter, contactInfo, message, errorMsg, status, createdAt) VALUES (?,?,?,?,?,?,?)',
+          [input.bowlerName, input.bowlerCenter, input.contactInfo, input.message, input.errorMsg ?? null, 'new', Date.now()]
+        );
+        return { success: true };
+      }),
 
+    list: publicProcedure.query(async () => {
+      const rows = await rawQuery(
+        'SELECT * FROM support_messages ORDER BY createdAt DESC LIMIT 200',
+        []
+      ) as any[];
+      return rows;
+    }),
+
+    reply: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        reply: z.string().min(1).max(2000),
+      }))
+      .mutation(async ({ input }) => {
+        await rawQuery(
+          'UPDATE support_messages SET edReply=?, status=?, repliedAt=? WHERE id=?',
+          [input.reply, 'replied', Date.now(), input.id]
+        );
+        // Notify owner (Cassie) via built-in notification
+        const { notifyOwner } = await import('./_core/notification');
+        const row = (await rawQuery('SELECT * FROM support_messages WHERE id=?', [input.id]) as any[])[0];
+        await notifyOwner({
+          title: `📬 Reply sent to ${row?.bowlerName ?? 'bowler'}`,
+          content: `Your reply was recorded. Bowler: ${row?.bowlerName} | Contact: ${row?.contactInfo}\n\nYour reply: ${input.reply}`,
+        });
+        return { success: true };
+      }),
+
+    markRead: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await rawQuery(
+          'UPDATE support_messages SET status=? WHERE id=? AND status=?',
+          ['read', input.id, 'new']
+        );
+        return { success: true };
+      }),
+  }),
+});
 export type AppRouter = typeof appRouter;
