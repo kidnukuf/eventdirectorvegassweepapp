@@ -11,10 +11,17 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 import { normalizeSquadTime } from "@/lib/squadTime";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
+
+// ─── PWA install popup types ──────────────────────────────────────────────────
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 const BOWLER_TOKEN_KEY = "vsn_bowler_token";
 
@@ -211,8 +218,111 @@ function PassportStep({ profile, onDone }: { profile: any; onDone: () => void })
     ? `${profile.startDate} – ${profile.endDate}`
     : profile.bowlingDate ?? "Date TBD";
 
+  // PWA install popup — fires once after passport page loads
+  const [pwaPopupOpen, setPwaPopupOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isIosDevice] = useState(() => /iphone|ipad|ipod/i.test(navigator.userAgent));
+  const [isStandalone] = useState(() =>
+    ("standalone" in window.navigator && (window.navigator as any).standalone) ||
+    window.matchMedia("(display-mode: standalone)").matches
+  );
+
+  useEffect(() => {
+    if (isStandalone) return;
+    const alreadyDismissed = sessionStorage.getItem("pwa_popup_dismissed") === "1";
+    if (alreadyDismissed) return;
+
+    if (isIosDevice) {
+      // Show popup immediately for iOS
+      setPwaPopupOpen(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setPwaPopupOpen(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, [isIosDevice, isStandalone]);
+
+  function handlePwaDismiss() {
+    sessionStorage.setItem("pwa_popup_dismissed", "1");
+    setPwaPopupOpen(false);
+  }
+
+  async function handlePwaInstall() {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    if (choice.outcome === "accepted") {
+      sessionStorage.setItem("pwa_popup_dismissed", "1");
+      setPwaPopupOpen(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a0533] via-[#2d0a5e] to-[#0a1a3d] p-4 pb-10">
+
+      {/* ── PWA Install Popup ── */}
+      <Dialog open={pwaPopupOpen} onOpenChange={(open) => { if (!open) handlePwaDismiss(); }}>
+        <DialogContent className="bg-zinc-900 border border-cyan-500/40 text-white max-w-sm mx-auto rounded-2xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-cyan-300 text-lg font-extrabold flex items-center gap-2">
+              📲 Add to Your Home Screen
+            </DialogTitle>
+            <DialogDescription className="text-white/70 text-sm leading-relaxed">
+              Install the B.O.B. Roll-off Passport app for instant access to your QR codes — no browser needed!
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Android / Chrome — native install */}
+          {deferredPrompt && (
+            <div className="space-y-3 pt-1">
+              <button
+                onClick={handlePwaInstall}
+                className="w-full py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 active:scale-[0.97] transition-all text-black font-bold text-sm tracking-wide"
+              >
+                ⬇️ Install App
+              </button>
+              <button
+                onClick={handlePwaDismiss}
+                className="w-full py-2 text-white/50 hover:text-white/80 text-sm transition-colors"
+              >
+                Maybe later
+              </button>
+            </div>
+          )}
+
+          {/* iOS — manual instructions */}
+          {isIosDevice && !deferredPrompt && (
+            <div className="space-y-3 pt-1">
+              <ol className="space-y-2 text-cyan-200/80 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-cyan-400 font-bold flex-shrink-0">1.</span>
+                  Tap the <span className="text-cyan-300 font-semibold">Share ⬆</span> button at the bottom of Safari
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-cyan-400 font-bold flex-shrink-0">2.</span>
+                  Scroll down and tap <span className="text-cyan-300 font-semibold">“Add to Home Screen”</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-cyan-400 font-bold flex-shrink-0">3.</span>
+                  Tap <span className="text-cyan-300 font-semibold">“Add”</span> — your passport is one tap away!
+                </li>
+              </ol>
+              <button
+                onClick={handlePwaDismiss}
+                className="w-full mt-2 py-2 rounded-xl border border-white/20 text-white/60 hover:text-white text-sm transition-colors"
+              >
+                Got it!
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="text-center pt-8 mb-6">

@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { getBowlerToken, clearBowlerSession, BOWLER_IS_CAPTAIN_KEY } from "./BowlerLogin";
 import { normalizeSquadTime } from "@/lib/squadTime";
 import { detectGroupSlug, GROUP_THEMES } from "@/lib/eventGroup";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
@@ -671,6 +672,9 @@ export default function BowlerDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Add to Home Screen button ── */}
+        <PwaInstallPrompt />
 
         {/* ── 2. Lane to Banquet animated placard ── */}
         <LaneToBanquetPlacard

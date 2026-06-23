@@ -387,3 +387,9 @@
 - [x] "Remind me later" button dismisses popup and sets sessionStorage flag so it doesn't re-appear in same session
 - [x] On successful submit, popup closes and shows success toast; contactSent flag prevents re-trigger
 - [x] TypeScript clean (0 errors), save checkpoint
+
+## Phase 33: PWA Install Prompt + Seating Chart Testing
+- [x] Add Dialog-based PWA install popup to BowlerConfirmation PassportStep (fires once after sign-up, iOS instructions + Android native install, sessionStorage dismiss flag)
+- [x] Add PwaInstallPrompt banner component to BowlerDashboard above Lane→Banquet accordion
+- [x] Seating Chart algorithm tested: 8 test suites all pass (ID parsing, balanced table sizes, full 55-bowler run, tab/CSV input, 450-bowler large dataset, center isolation, guest adjacency, output format XX-L)
+- [x] TypeScript clean (0 errors), save checkpoint, push to GitHub
