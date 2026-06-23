@@ -61,10 +61,18 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value?: 
 }
 
 // ─── Animated "Lane to Banquet" placard ───────────────────────────────────────
-function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
+function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime, hotelName, confirmationCode, checkinDate, checkoutDate, roomType, banquetTable, banquetLocation, banquetTime }: {
   laneToEvent?: string | null;
   laneNumber?: number | null;
   squadTime?: string | null;
+  hotelName?: string | null;
+  confirmationCode?: string | null;
+  checkinDate?: string | null;
+  checkoutDate?: string | null;
+  roomType?: string | null;
+  banquetTable?: string | null;
+  banquetLocation?: string | null;
+  banquetTime?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [animating, setAnimating] = useState(false);
@@ -77,7 +85,9 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
     setOpen(o => !o);
   }
 
-  const hasInfo = laneToEvent || laneNumber || squadTime;
+  const hasHotel = hotelName || confirmationCode || checkinDate || checkoutDate;
+  const hasBanquet = banquetTable || banquetLocation || banquetTime;
+  const hasInfo = laneToEvent || laneNumber || squadTime || hasHotel || hasBanquet;
   if (!hasInfo) return null;
 
   return (
@@ -114,6 +124,61 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
         )}
 
         <div className="space-y-3 pt-1 border-t border-white/10">
+
+          {/* ── Reg: Hotel Registration ── */}
+          {hasHotel && (
+            <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <p className="text-blue-300 text-xs font-semibold mb-2">🏨 Reg — Hotel Registration</p>
+              <div className="space-y-1.5">
+                {hotelName && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🏨</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Hotel</p>
+                      <p className="text-white font-semibold text-sm">{hotelName}</p>
+                    </div>
+                  </div>
+                )}
+                {confirmationCode && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🔑</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Confirmation #</p>
+                      <p className="text-amber-300 font-mono font-bold text-sm tracking-wider">{confirmationCode}</p>
+                    </div>
+                  </div>
+                )}
+                {checkinDate && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📅</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Check-In</p>
+                      <p className="text-white font-semibold text-sm">{checkinDate}</p>
+                    </div>
+                  </div>
+                )}
+                {checkoutDate && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📅</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Check-Out</p>
+                      <p className="text-white font-semibold text-sm">{checkoutDate}</p>
+                    </div>
+                  </div>
+                )}
+                {roomType && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🛏️</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Room Type</p>
+                      <p className="text-white font-semibold text-sm">{roomType}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {laneNumber && (
             <div className="flex items-center gap-3">
               <span className="text-lg">🎳</span>
@@ -138,6 +203,43 @@ function LaneToBanquetPlacard({ laneToEvent, laneNumber, squadTime }: {
               <div>
                 <p className="text-white/75 text-xs">Lane to Banquet Directions</p>
                 <p className="text-amber-200 font-semibold text-sm leading-relaxed">{laneToEvent}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Banquet Table Assignment ── */}
+          {hasBanquet && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <p className="text-amber-300 text-xs font-semibold mb-2">🍽️ Banquet Dinner Assignment</p>
+              <div className="space-y-1.5">
+                {banquetLocation && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📍</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Banquet Location</p>
+                      <p className="text-white font-semibold text-sm">{banquetLocation}</p>
+                    </div>
+                  </div>
+                )}
+                {banquetTime && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🕐</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Dinner Time</p>
+                      <p className="text-white font-semibold text-sm">{banquetTime}</p>
+                    </div>
+                  </div>
+                )}
+                {banquetTable && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🪑</span>
+                    <div>
+                      <p className="text-white/60 text-xs">Your Table</p>
+                      <p className="text-amber-300 font-bold text-base">Table {banquetTable}</p>
+                      <p className="text-white/50 text-xs">Choose any available seat at your table</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -480,6 +582,14 @@ export default function BowlerDashboard() {
           laneToEvent={p.laneToEvent}
           laneNumber={p.laneNumber}
           squadTime={p.squadTime}
+          hotelName={p.hotelName}
+          confirmationCode={(p as any).confirmationCode}
+          checkinDate={p.checkinDate}
+          checkoutDate={p.checkoutDate}
+          roomType={p.roomType}
+          banquetTable={(p as any).banquetTable}
+          banquetLocation={(p as any).banquetLocation}
+          banquetTime={(p as any).banquetTime}
         />
 
         {/* ── 3. Event Details ── */}
@@ -493,18 +603,7 @@ export default function BowlerDashboard() {
           <InfoRow icon="📆" label="Bowling Date" value={p.bowlingDate ?? undefined} />
         </div>
 
-        {/* ── 4. Hotel Info ── */}
-        {p.hotelName && (
-          <div className="bowler-card">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-              <span>🏨</span> Hotel Reservation
-            </h3>
-            <InfoRow icon="🏨" label="Hotel" value={p.hotelName} />
-            <InfoRow icon="📅" label="Check-In" value={p.checkinDate ?? undefined} />
-            <InfoRow icon="📅" label="Check-Out" value={p.checkoutDate ?? undefined} />
-            <InfoRow icon="🛏️" label="Room Type" value={p.roomType ?? undefined} />
-          </div>
-        )}
+        {/* Hotel info is now inside the Lane to Banquet accordion (Reg section) */}
 
         {/* ── 5. Payment Status ── */}
         {p.totalAmountDue && (

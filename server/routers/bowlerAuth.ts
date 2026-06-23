@@ -142,6 +142,7 @@ async function getBowlerProfile(bowlerId: number) {
     checkinDate: string | null;
     checkoutDate: string | null;
     roomType: string | null;
+    confirmationCode: string | null;
     // payment
     totalAmountDue: string | null;
     paid: number | null;
@@ -162,7 +163,7 @@ async function getBowlerProfile(bowlerId: number) {
             t.teamName, t.teamCode, bc.centerName,
             b.laneNumber, b.squadTime, b.laneToEvent,
             e.eventName, e.bowlingDate,
-            h.hotelName, h.checkinDate, h.checkoutDate, h.roomType,
+            h.hotelName, h.checkinDate, h.checkoutDate, h.roomType, h.confirmationCode,
             p.totalAmountDue, p.paid,
             b.poolPartyToken, b.poolPartyUsed, b.banquetToken, b.banquetUsed,
             b.guestPoolPartyAmount, b.eventId,
