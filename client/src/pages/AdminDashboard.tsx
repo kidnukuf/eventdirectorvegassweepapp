@@ -1058,7 +1058,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                           <td className="px-4 py-2 text-gray-400 text-xs">{String(b.teamName ?? "—")}</td>
                           <td className="px-4 py-2 text-gray-400">{String(b.phone ?? "—")}</td>
                           <td className="px-4 py-2"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[String(b.registrationStatus ?? "pre_registered")]}`}>{STATUS_LABELS[String(b.registrationStatus ?? "pre_registered")] ?? String(b.registrationStatus)}</span></td>
-                          <td className="px-4 py-2"><button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") }); }} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button></td>
+                          <td className="px-4 py-2"><button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? ""), confirmationCode: String((b as Record<string,unknown>).confirmationCode ?? "") }); }} className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button></td>
                         </tr>
                         );
                       })}
@@ -1131,7 +1131,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                                     </span>
                                   </td>
                                   <td className="px-4 py-2">
-                                    <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") });
+                                    <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? ""), confirmationCode: String((b as Record<string,unknown>).confirmationCode ?? "") });
                                     }}
                                       className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition-colors">Edit</button>
                                   </td>
@@ -1451,7 +1451,7 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
                       <div className="text-gray-500 text-xs mt-1">Signed up: {b.createdAt ? new Date(b.createdAt as string).toLocaleString() : "—"}</div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), registrationStatus: "signed_up", sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? "") }); setShowAllFields(true); }}
+                      <button onClick={() => { setEditingBowler(b); setEditFields({ legalFirstName: String(b.legalFirstName ?? ""), legalLastName: String(b.legalLastName ?? ""), phone: String(b.phone ?? ""), email: String(b.email ?? ""), notes: String(b.notes ?? ""), registrationStatus: "signed_up", sanctionNumber: String(b.sanctionNumber ?? ""), gamesPlayed: String(b.gamesPlayed ?? ""), bestAverage: String(b.bestAverage ?? ""), tshirtSize: String(b.tshirtSize ?? ""), under21: b.under21 ? "true" : "false", leagueMember: b.leagueMember ? "true" : "false", banquetTable: String((b as Record<string,unknown>).banquetTable ?? ""), confirmationCode: String((b as Record<string,unknown>).confirmationCode ?? "") }); setShowAllFields(true); }}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold transition-colors">Link / Edit</button>
                       <span className="px-2 py-1 bg-red-900/50 text-red-300 rounded text-xs">Unmatched</span>
                     </div>
@@ -1552,6 +1552,17 @@ function AdminDashboardInner({ onSignOut }: { onSignOut: () => void }) {
               </button>
               {showAllFields && (
                 <>
+                  {/* Hotel Confirmation Code */}
+                  <div className="pt-1 border-t border-blue-500/20">
+                    <p className="text-xs text-blue-400/80 mb-2 uppercase tracking-wide">🏨 Hotel Registration</p>
+                    <label className="text-xs text-gray-400 mb-1 block">Confirmation #</label>
+                    <input
+                      value={editFields.confirmationCode ?? ""}
+                      onChange={(e) => setEditFields({ ...editFields, confirmationCode: e.target.value })}
+                      placeholder="e.g. XTEST7"
+                      className="w-full px-3 py-2 bg-[#111] border border-blue-500/30 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-blue-400" />
+                    <p className="text-xs text-gray-500 mt-1">Appears in the bowler's Lane to Banquet accordion under Reg.</p>
+                  </div>
                   {(["checkinDate", "checkoutDate", "roomType", "roomNumber", "banquetAmount", "laneAssignment", "squadTime", "notes"] as const).map((field) => (
                     <div key={field}>
                       <label className="text-xs text-gray-400 mb-1 block capitalize">{field.replace(/([A-Z])/g, " $1")}</label>

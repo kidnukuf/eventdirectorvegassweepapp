@@ -221,7 +221,7 @@ export const appRouter = router({
         actorId: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
-        const HOTEL_FIELDS = ["checkinDate","checkoutDate","roomType","roomNumber","roommateRequested","roommateFirstName","roommateLastName","roomAmount"];
+        const HOTEL_FIELDS = ["checkinDate","checkoutDate","roomType","roomNumber","roommateRequested","roommateFirstName","roommateLastName","roomAmount","confirmationCode"];
         const PAYMENT_FIELDS = ["banquetAmount","poolParty","totalAmountDue","paid"];
         const bowlerFields: Record<string, unknown> = {};
         const hotelFields: Record<string, unknown> = {};
