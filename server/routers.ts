@@ -117,7 +117,8 @@ export const appRouter = router({
         await rawQuery('DELETE FROM contact_requests WHERE bowlerId IN (SELECT id FROM bowlers WHERE eventId=?)', [eventId]);
         await rawQuery('DELETE FROM hotel_records WHERE bowlerId IN (SELECT id FROM bowlers WHERE eventId=?)', [eventId]);
         await rawQuery('DELETE FROM payment_records WHERE bowlerId IN (SELECT id FROM bowlers WHERE eventId=?)', [eventId]);
-        await rawQuery('DELETE FROM support_messages WHERE eventId=?', [eventId]);
+        // support_messages has no eventId column — delete all (global inbox)
+        await rawQuery('DELETE FROM support_messages WHERE 1=1', []);
         await rawQuery('DELETE FROM auditLog WHERE eventId=?', [eventId]);
         await rawQuery('DELETE FROM app_users WHERE eventId=?', [eventId]);
         await rawQuery('DELETE FROM lane_assignments WHERE eventId=?', [eventId]);
