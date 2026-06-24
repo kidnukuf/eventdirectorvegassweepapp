@@ -415,8 +415,11 @@
 - [x] Save checkpoint, push to GitHub
 
 ## Phase 39: Google Sheet Reformat + Bowler ID Write-back + Hotel Reg# in Dashboard
-- [ ] Insert Bowler ID as new column A in Google Sheet (shift all existing columns right by 1)
-- [ ] Update import parser to read new column positions (B=Phone, C=Email, D=Squad, E=Lane, F=Center, G=Team#, H=Captain, I=FirstName, J=LastName, K=Under21, L=Sanction, M=Games, N=BestAvg, O=TeamName, P=LeagueMember, Q=TShirt, R=HotelConf, S=CheckIn, T=CheckOut, U=RoommateFirst, V=RoommateLast, W=GuestPool, X=ExtraBanquet, Y=BanquetQR, Z=PoolPartyQR, AA-AE=guest QRs)
-- [ ] On bowler sign-up completion: write Bowler ID to col A and QR URLs to cols Y-AE of the matching sheet row
-- [ ] Replace hotel QR code with hotel confirmation/registration number in BowlerDashboard Lane→Banquet section
-- [ ] Save checkpoint, push to GitHub
+- [x] Insert Bowler ID as new column A in Google Sheet (shift all existing columns right by 1)
+- [x] Update googleSheets.ts with new spreadsheet ID, shifted column constants (FirstName=I=8, LastName=J=9, Lane=E=4, BanquetQR=Y=24, PoolQR=Z=25), and writeBowlerIdToSheet() function
+- [x] Import parser uses header-name matching so no column-index changes needed in ImportData.tsx
+- [x] On import: fire-and-forget writeBowlerIdToSheet() writes scantron ID to col A of matching sheet row
+- [x] writeContactInfoToSheet updated to write phone→B, email→C (was A, B before Bowler ID insert)
+- [x] QR write-back already uses Y/Z/AA-AE which now match the new column layout
+- [x] Replace hotel QR code with hotel confirmation/registration number in BowlerDashboard and CaptainDashboard Lane→Banquet section (Reg# shown prominently at top, "Coming soon" removed)
+- [x] Save checkpoint, push to GitHub
