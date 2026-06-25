@@ -837,7 +837,7 @@ export default function BowlerDashboard() {
           title="Pool Party Passport"
           icon="🏊"
           subtitle="Funtime Team Challenge 2026 — Pool Party"
-          checkInTime="Pool Party — Check-in begins at 2:00 PM"
+          checkInTime="Pool Party — Check-in begins at 7:00 PM"
           entranceFlow="Show this QR code to the pool party doorman. Your code will be scanned and marked as used — one scan per person. A wristband will be issued for re-entry. If you believe you should be eligible but don't see a QR code, please contact your team captain or the Event Director."
           qrDataUrl={p.poolPartyQR}
           tokenUsed={Boolean(p.poolPartyUsed)}
